@@ -8,6 +8,7 @@ export interface PanelSizes {
 	properties: number;
 	mainContent: number;
 	timeline: number;
+	trackLabels: number;
 }
 
 export type PanelId = keyof PanelSizes;
@@ -82,6 +83,7 @@ export const usePanelStore = create<PanelState>()(
 							PANEL_CONFIG.panels.properties,
 						mainContent: state.mainContent ?? PANEL_CONFIG.panels.mainContent,
 						timeline: state.timeline ?? PANEL_CONFIG.panels.timeline,
+						trackLabels: PANEL_CONFIG.panels.trackLabels,
 					},
 				};
 			},

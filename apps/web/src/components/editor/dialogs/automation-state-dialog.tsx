@@ -7,6 +7,7 @@ import {
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
+	DialogBody,
 	DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -142,7 +143,7 @@ export function AutomationStateDialog() {
 					</DialogTitle>
 				</DialogHeader>
 
-				<div className="space-y-4 py-4">
+				<DialogBody className="gap-4">
 					{/* Name input */}
 					<div className="space-y-2">
 						<Label htmlFor="name">Name</Label>
@@ -190,7 +191,7 @@ export function AutomationStateDialog() {
 							Add Operation
 						</Button>
 					</div>
-				</div>
+				</DialogBody>
 
 				<DialogFooter>
 					<Button variant="outline" onClick={handleClose}>

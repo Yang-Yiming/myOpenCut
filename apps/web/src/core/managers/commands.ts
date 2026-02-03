@@ -4,7 +4,7 @@ export class CommandManager {
 	private history: Command[] = [];
 	private redoStack: Command[] = [];
 
-	execute({ command }: { command: Command }): Command {
+	execute(command: Command): Command {
 		command.execute();
 		this.history.push(command);
 		this.redoStack = [];

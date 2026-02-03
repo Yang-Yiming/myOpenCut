@@ -34,18 +34,18 @@ export class TimelineManager {
 
 	addTrack({ type, index }: { type: TrackType; index?: number }): string {
 		const command = new AddTrackCommand(type, index);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 		return command.getTrackId();
 	}
 
 	removeTrack({ trackId }: { trackId: string }): void {
 		const command = new RemoveTrackCommand(trackId);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	insertElement({ element, placement }: InsertElementParams): void {
 		const command = new InsertElementCommand({ element, placement });
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	updateElementTrim({
@@ -61,7 +61,7 @@ export class TimelineManager {
 	}): void {
 		const command = new UpdateElementTrimCommand(elementId, trimStart, trimEnd);
 		if (pushHistory) {
-			this.editor.command.execute({ command });
+			this.editor.command.execute(command);
 		} else {
 			command.execute();
 		}
@@ -84,7 +84,7 @@ export class TimelineManager {
 			duration,
 		);
 		if (pushHistory) {
-			this.editor.command.execute({ command });
+			this.editor.command.execute(command);
 		} else {
 			command.execute();
 		}
@@ -98,7 +98,7 @@ export class TimelineManager {
 		startTime: number;
 	}): void {
 		const command = new UpdateElementStartTimeCommand(elements, startTime);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	moveElement({
@@ -121,17 +121,17 @@ export class TimelineManager {
 			newStartTime,
 			createTrack,
 		);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	toggleTrackMute({ trackId }: { trackId: string }): void {
 		const command = new ToggleTrackMuteCommand(trackId);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	toggleTrackVisibility({ trackId }: { trackId: string }): void {
 		const command = new ToggleTrackVisibilityCommand(trackId);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	splitElements({
@@ -144,7 +144,7 @@ export class TimelineManager {
 		retainSide?: "both" | "left" | "right";
 	}): { trackId: string; elementId: string }[] {
 		const command = new SplitElementsCommand(elements, splitTime, retainSide);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 		return command.getRightSideElements();
 	}
 
@@ -186,7 +186,7 @@ export class TimelineManager {
 		clipboardItems: ClipboardItem[];
 	}): { trackId: string; elementId: string }[] {
 		const command = new PasteCommand(time, clipboardItems);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 		return command.getPastedElements();
 	}
 
@@ -196,7 +196,7 @@ export class TimelineManager {
 		elements: { trackId: string; elementId: string }[];
 	}): void {
 		const command = new DeleteElementsCommand(elements);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	updateTextElement({
@@ -224,7 +224,7 @@ export class TimelineManager {
 		>;
 	}): void {
 		const command = new UpdateTextElementCommand(trackId, elementId, updates);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	duplicateElements({
@@ -233,7 +233,7 @@ export class TimelineManager {
 		elements: { trackId: string; elementId: string }[];
 	}): { trackId: string; elementId: string }[] {
 		const command = new DuplicateElementsCommand({ elements });
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 		return command.getDuplicatedElements();
 	}
 
@@ -243,7 +243,7 @@ export class TimelineManager {
 		elements: { trackId: string; elementId: string }[];
 	}): void {
 		const command = new ToggleElementsVisibilityCommand(elements);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	toggleElementsMuted({
@@ -252,7 +252,7 @@ export class TimelineManager {
 		elements: { trackId: string; elementId: string }[];
 	}): void {
 		const command = new ToggleElementsMutedCommand(elements);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	getTracks(): TimelineTrack[] {

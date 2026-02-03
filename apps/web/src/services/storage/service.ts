@@ -94,6 +94,8 @@ class StorageService {
 			isMain: scene.isMain,
 			tracks: this.stripAudioBuffers({ tracks: scene.tracks }),
 			bookmarks: scene.bookmarks,
+			automationStates: scene.automationStates,
+			automationMarkers: scene.automationMarkers,
 			createdAt: scene.createdAt.toISOString(),
 			updatedAt: scene.updatedAt.toISOString(),
 		}));
@@ -138,6 +140,8 @@ class StorageService {
 						: track,
 				),
 				bookmarks: scene.bookmarks ?? [],
+				automationStates: scene.automationStates ?? [],
+				automationMarkers: scene.automationMarkers ?? [],
 				createdAt: new Date(scene.createdAt),
 				updatedAt: new Date(scene.updatedAt),
 			})) ?? [];

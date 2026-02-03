@@ -2,6 +2,11 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+	ResizablePanelGroup,
+	ResizablePanel,
+	ResizableHandle,
+} from "@/components/ui/resizable";
+import {
 	Delete02Icon,
 	TaskAdd02Icon,
 	ViewIcon,
@@ -55,10 +60,12 @@ import { useTimelinePlayhead } from "@/hooks/timeline/use-timeline-playhead";
 import { DragLine } from "./drag-line";
 import { invokeAction } from "@/lib/actions";
 import { RenameTrackCommand } from "@/lib/commands";
+import { usePanelStore } from "@/stores/panel-store";
 
 export function Timeline() {
 	const tracksContainerHeight = { min: 0, max: 800 };
 	const { snappingEnabled } = useTimelineStore();
+	const { panels, setPanel } = usePanelStore();
 	const { clearElementSelection, setElementSelection } = useElementSelection();
 	const editor = useEditor();
 	const timeline = editor.timeline;
@@ -228,82 +235,98 @@ export function Timeline() {
 					tracksScrollRef={tracksScrollRef}
 					isVisible={showSnapIndicator}
 				/>
-				<div className="flex flex-1 overflow-hidden">
-					<div className="bg-panel flex w-28 shrink-0 flex-col border-r">
-						<div className="bg-panel flex h-4 items-center justify-between px-3">
-							<span className="opacity-0">.</span>
-						</div>
-						<div className="bg-panel flex h-4 items-center justify-between px-3">
-							<span className="opacity-0">.</span>
-						</div>
-						{tracks.length > 0 && (
-							<div
-								ref={trackLabelsRef}
-								className="bg-panel flex-1 overflow-y-auto"
-								style={{ paddingTop: TIMELINE_CONSTANTS.PADDING_TOP_PX }}
-							>
-								<ScrollArea className="size-full" ref={trackLabelsScrollRef}>
-									<div className="flex flex-col gap-1">
-										{tracks.map((track) => (
-											<div
-												key={track.id}
-												className="group flex items-center gap-2 px-3"
-												style={{
-													height: `${getTrackHeight({ type: track.type })}px`,
-												}}
-											>
-												<div className="flex min-w-0 flex-1 items-center gap-2">
-													<TrackIcon track={track} />
-													<div className="min-w-0 flex-1">
-														<TrackLabel track={track} allTracks={tracks} />
+				<ResizablePanelGroup
+					direction="horizontal"
+					className="flex-1 overflow-hidden"
+					onLayout={(sizes) => {
+						setPanel("trackLabels", sizes[0] ?? panels.trackLabels);
+					}}
+				>
+					<ResizablePanel
+						defaultSize={panels.trackLabels}
+						minSize={10}
+						maxSize={30}
+						className="min-w-0"
+					>
+						<div className="bg-panel flex size-full flex-col border-r">
+							<div className="bg-panel flex h-4 items-center justify-between px-3">
+								<span className="opacity-0">.</span>
+							</div>
+							<div className="bg-panel flex h-4 items-center justify-between px-3">
+								<span className="opacity-0">.</span>
+							</div>
+							{tracks.length > 0 && (
+								<div
+									ref={trackLabelsRef}
+									className="bg-panel flex-1 overflow-y-auto"
+									style={{ paddingTop: TIMELINE_CONSTANTS.PADDING_TOP_PX }}
+								>
+									<ScrollArea className="size-full" ref={trackLabelsScrollRef}>
+										<div className="flex flex-col gap-1">
+											{tracks.map((track) => (
+												<div
+													key={track.id}
+													className="group flex items-center gap-2 px-3"
+													style={{
+														height: `${getTrackHeight({ type: track.type })}px`,
+													}}
+												>
+													<div className="flex min-w-0 flex-1 items-center gap-2">
+														<TrackIcon track={track} />
+														<div className="min-w-0 flex-1">
+															<TrackLabel track={track} allTracks={tracks} />
+														</div>
+													</div>
+													<div className="flex items-center gap-1">
+														{process.env.NODE_ENV === "development" &&
+															isMainTrack(track) && (
+																<div className="bg-red-500 size-1.5 rounded-full" />
+															)}
+														{canTracktHaveAudio(track) && (
+															<TrackToggleIcon
+																isOff={track.muted}
+																icons={{
+																	on: VolumeHighIcon,
+																	off: VolumeOffIcon,
+																}}
+																onClick={() =>
+																	editor.timeline.toggleTrackMute({
+																		trackId: track.id,
+																	})
+																}
+															/>
+														)}
+														{canTrackBeHidden(track) && (
+															<TrackToggleIcon
+																isOff={track.hidden}
+																icons={{
+																	on: ViewIcon,
+																	off: ViewOffSlashIcon,
+																}}
+																onClick={() =>
+																	editor.timeline.toggleTrackVisibility({
+																		trackId: track.id,
+																	})
+																}
+															/>
+														)}
 													</div>
 												</div>
-												<div className="flex items-center gap-1">
-													{process.env.NODE_ENV === "development" &&
-														isMainTrack(track) && (
-															<div className="bg-red-500 size-1.5 rounded-full" />
-														)}
-													{canTracktHaveAudio(track) && (
-														<TrackToggleIcon
-															isOff={track.muted}
-															icons={{
-																on: VolumeHighIcon,
-																off: VolumeOffIcon,
-															}}
-															onClick={() =>
-																editor.timeline.toggleTrackMute({
-																	trackId: track.id,
-																})
-															}
-														/>
-													)}
-													{canTrackBeHidden(track) && (
-														<TrackToggleIcon
-															isOff={track.hidden}
-															icons={{
-																on: ViewIcon,
-																off: ViewOffSlashIcon,
-															}}
-															onClick={() =>
-																editor.timeline.toggleTrackVisibility({
-																	trackId: track.id,
-																})
-															}
-														/>
-													)}
-												</div>
-											</div>
-										))}
-									</div>
-								</ScrollArea>
-							</div>
-						)}
-					</div>
+											))}
+										</div>
+									</ScrollArea>
+								</div>
+							)}
+						</div>
+					</ResizablePanel>
 
-					<div
-						className="relative flex flex-1 flex-col overflow-hidden"
-						ref={tracksContainerRef}
-					>
+					<ResizableHandle withHandle />
+
+					<ResizablePanel defaultSize={100 - panels.trackLabels}>
+						<div
+							className="relative flex size-full flex-col overflow-hidden"
+							ref={tracksContainerRef}
+						>
 						<SelectionBox
 							startPos={selectionBox?.startPos || null}
 							currentPos={selectionBox?.currentPos || null}
@@ -517,7 +540,8 @@ export function Timeline() {
 							</div>
 						</ScrollArea>
 					</div>
-				</div>
+				</ResizablePanel>
+			</ResizablePanelGroup>
 			</div>
 		</section>
 	);

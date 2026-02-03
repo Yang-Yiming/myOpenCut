@@ -36,7 +36,7 @@ export class ScenesManager {
 		}
 
 		const command = new CreateSceneCommand(name, isMain);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 		return command.getSceneId();
 	}
 
@@ -57,7 +57,7 @@ export class ScenesManager {
 		}
 
 		const command = new DeleteSceneCommand(sceneId);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	async renameScene({
@@ -72,7 +72,7 @@ export class ScenesManager {
 		}
 
 		const command = new RenameSceneCommand(sceneId, name);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	async switchToScene({ sceneId }: { sceneId: string }): Promise<void> {
@@ -103,7 +103,7 @@ export class ScenesManager {
 
 	async toggleBookmark({ time }: { time: number }): Promise<void> {
 		const command = new ToggleBookmarkCommand(time);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	isBookmarked({ time }: { time: number }): boolean {
@@ -122,7 +122,7 @@ export class ScenesManager {
 
 	async removeBookmark({ time }: { time: number }): Promise<void> {
 		const command = new RemoveBookmarkCommand(time);
-		this.editor.command.execute({ command });
+		this.editor.command.execute(command);
 	}
 
 	async loadProjectScenes({ projectId }: { projectId: string }): Promise<void> {
@@ -221,6 +221,29 @@ export class ScenesManager {
 
 	getScenes(): TScene[] {
 		return this.list;
+	}
+
+	updateScene(sceneId: string, updatedScene: TScene): void {
+		this.list = this.list.map((s) => (s.id === sceneId ? updatedScene : s));
+
+		if (this.active?.id === sceneId) {
+			this.active = updatedScene;
+		}
+
+		this.notify();
+
+		const activeProject = this.editor.project.getActive();
+		if (activeProject) {
+			const updatedProject = {
+				...activeProject,
+				scenes: this.list,
+				metadata: {
+					...activeProject.metadata,
+					updatedAt: new Date(),
+				},
+			};
+			this.editor.project.setActiveProject({ project: updatedProject });
+		}
 	}
 
 	setScenes({

@@ -447,7 +447,7 @@ export class ProjectManager {
 
 		const command = new UpdateProjectSettingsCommand(settings);
 		if (pushHistory) {
-			this.editor.command.execute({ command });
+			this.editor.command.execute(command);
 			return;
 		}
 
