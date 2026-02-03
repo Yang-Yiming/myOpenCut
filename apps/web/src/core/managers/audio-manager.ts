@@ -222,43 +222,55 @@ export class AudioManager {
 		const iterator = sink.buffers(sourceStartTime);
 		this.clipIterators.set(clip.id, iterator);
 
-		for await (const { buffer, timestamp } of iterator) {
-			if (!this.editor.playback.getIsPlaying()) return;
-			if (sessionId !== this.playbackSessionId) return;
+		try {
+			for await (const { buffer, timestamp } of iterator) {
+				if (!this.editor.playback.getIsPlaying()) return;
+				if (sessionId !== this.playbackSessionId) return;
 
-			const timelineTime = clip.startTime + (timestamp - clip.trimStart);
-			if (timelineTime >= clipEnd) break;
+				const timelineTime = clip.startTime + (timestamp - clip.trimStart);
+				if (timelineTime >= clipEnd) break;
 
-			const node = audioContext.createBufferSource();
-			node.buffer = buffer;
-			node.connect(this.masterGain ?? audioContext.destination);
+				const node = audioContext.createBufferSource();
+				node.buffer = buffer;
+				node.connect(this.masterGain ?? audioContext.destination);
 
-			const startTimestamp =
-				this.playbackStartContextTime +
-				(timelineTime - this.playbackStartTime);
+				const startTimestamp =
+					this.playbackStartContextTime +
+					(timelineTime - this.playbackStartTime);
 
-			if (startTimestamp >= audioContext.currentTime) {
-				node.start(startTimestamp);
-			} else {
-				const offset = audioContext.currentTime - startTimestamp;
-				if (offset < buffer.duration) {
-					node.start(audioContext.currentTime, offset);
+				if (startTimestamp >= audioContext.currentTime) {
+					node.start(startTimestamp);
 				} else {
-					continue;
+					const offset = audioContext.currentTime - startTimestamp;
+					if (offset < buffer.duration) {
+						node.start(audioContext.currentTime, offset);
+					} else {
+						continue;
+					}
+				}
+
+				this.queuedSources.add(node);
+				node.addEventListener("ended", () => {
+					node.disconnect();
+					this.queuedSources.delete(node);
+				});
+
+				const aheadTime = timelineTime - this.getPlaybackTime();
+				if (aheadTime >= 1) {
+					await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
+					if (sessionId !== this.playbackSessionId) return;
 				}
 			}
-
-			this.queuedSources.add(node);
-			node.addEventListener("ended", () => {
-				node.disconnect();
-				this.queuedSources.delete(node);
-			});
-
-			const aheadTime = timelineTime - this.getPlaybackTime();
-			if (aheadTime >= 1) {
-				await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
-				if (sessionId !== this.playbackSessionId) return;
+		} catch (error) {
+			// Input may be disposed when timeline changes (e.g., muting a track)
+			// This is expected and we can safely ignore it
+			if (
+				error instanceof Error &&
+				error.message.includes("disposed")
+			) {
+				return;
 			}
+			throw error;
 		}
 
 		this.clipIterators.delete(clip.id);
