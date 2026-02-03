@@ -1,10 +1,12 @@
 "use client";
 
 import { useTimelineStore } from "@/stores/timeline-store";
+import { useAutomationStore } from "@/stores/automation-store";
 import { useActionHandler } from "@/hooks/actions/use-action-handler";
 import { useEditor } from "../use-editor";
 import { useElementSelection } from "../timeline/element/use-element-selection";
 import { getElementsAtTime } from "@/lib/timeline";
+import { AddAutomationMarkerCommand } from "@/lib/commands";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -247,6 +249,46 @@ export function useEditorActions() {
 		"toggle-bookmark",
 		() => {
 			editor.scenes.toggleBookmark({ time: editor.playback.getCurrentTime() });
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"mark-automation",
+		() => {
+			const { isMarkModeActive, activeMarkStateId, exitMarkMode } =
+				useAutomationStore.getState();
+
+			if (!isMarkModeActive || !activeMarkStateId) {
+				return; // Not in mark mode, do nothing
+			}
+
+			if (selectedElements.length > 0) {
+				// Mark selected clips (range markers)
+				for (const { trackId, elementId } of selectedElements) {
+					editor.command.execute(
+						new AddAutomationMarkerCommand({
+							type: "range",
+							stateId: activeMarkStateId,
+							trackId,
+							elementId,
+						}),
+					);
+				}
+			} else {
+				// Mark current timeline position (point marker)
+				const currentTime = editor.playback.getCurrentTime();
+				editor.command.execute(
+					new AddAutomationMarkerCommand({
+						type: "point",
+						stateId: activeMarkStateId,
+						time: currentTime,
+					}),
+				);
+			}
+
+			// Exit mark mode after marking
+			exitMarkMode();
 		},
 		undefined,
 	);

@@ -127,6 +127,11 @@ export const ACTIONS = {
 		description: "Toggle bookmark at playhead",
 		category: "timeline",
 	},
+	"mark-automation": {
+		description: "Mark automation at selection or playhead",
+		category: "timeline",
+		defaultShortcuts: ["h"],
+	},
 	undo: {
 		description: "Undo",
 		category: "history",

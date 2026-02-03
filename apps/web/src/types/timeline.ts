@@ -1,9 +1,13 @@
+import type { AutomationMarker, AutomationState } from "./automation";
+
 export interface TScene {
 	id: string;
 	name: string;
 	isMain: boolean;
 	tracks: TimelineTrack[];
 	bookmarks: number[];
+	automationStates?: AutomationState[];
+	automationMarkers?: AutomationMarker[];
 	createdAt: Date;
 	updatedAt: Date;
 }

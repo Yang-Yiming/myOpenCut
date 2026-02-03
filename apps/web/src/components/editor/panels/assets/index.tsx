@@ -9,6 +9,7 @@ import { SettingsView } from "./views/settings";
 import { SoundsView } from "./views/sounds";
 import { StickersView } from "./views/stickers";
 import { TextView } from "./views/text";
+import { AutomationView } from "./views/automation";
 
 export function AssetsPanel() {
 	const { activeTab } = useAssetsPanelStore();
@@ -39,6 +40,7 @@ export function AssetsPanel() {
 				Adjustment view coming soon...
 			</div>
 		),
+		automation: <AutomationView />,
 		settings: <SettingsView />,
 	};
 

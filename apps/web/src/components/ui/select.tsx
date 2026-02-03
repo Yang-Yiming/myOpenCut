@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Select as SelectPrimitive } from "radix-ui";
+import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -92,7 +92,7 @@ const SelectContent = React.forwardRef<
 		<SelectPrimitive.Content
 			ref={ref}
 			className={cn(
-			"bg-popover text-popover-foreground z-50 max-h-96 min-w-32 overflow-hidden rounded-2xl border p-2 shadow-lg",
+			"bg-popover text-popover-foreground z-[300] max-h-96 min-w-32 overflow-hidden rounded-2xl border p-2 shadow-lg",
 				className,
 			)}
 			position={position}

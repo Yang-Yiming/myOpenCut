@@ -242,3 +242,43 @@ export function validateElementTrackCompatibility({
 
 	return { isValid: true };
 }
+
+/**
+ * Generates a display name for a track with automatic numbering
+ * based on its position among tracks of the same type.
+ *
+ * @example
+ * // If there are 3 audio tracks, they will be numbered 1, 2, 3
+ * getTrackDisplayName(audioTrack1, allTracks) // "Audio track 1"
+ * getTrackDisplayName(audioTrack2, allTracks) // "Audio track 2"
+ */
+export function getTrackDisplayName(
+	track: TimelineTrack,
+	allTracks: TimelineTrack[],
+): string {
+	// Get all tracks of the same type
+	const tracksOfSameType = allTracks.filter((t) => t.type === track.type);
+
+	// Find the index of this track (1-based)
+	const index = tracksOfSameType.findIndex((t) => t.id === track.id) + 1;
+
+	// If track has a custom name (not the default), use it
+	const defaultName =
+		track.type === "audio"
+			? "Audio track"
+			: track.type === "video"
+				? "Video track"
+				: track.type === "text"
+					? "Text track"
+					: track.type === "sticker"
+						? "Sticker track"
+						: "Track";
+
+	// If the track name is still the default, add numbering
+	if (track.name === defaultName) {
+		return `${defaultName} ${index}`;
+	}
+
+	// If user has customized the name, keep it as-is
+	return track.name;
+}

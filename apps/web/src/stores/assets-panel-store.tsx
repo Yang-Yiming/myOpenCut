@@ -9,8 +9,10 @@ import {
 	MagicWand05Icon,
 	TextIcon,
 	Settings01Icon,
+	Settings02Icon,
 	SlidersHorizontalIcon,
 	ColorsIcon,
+	AiBrain01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 
@@ -24,6 +26,7 @@ export const TAB_KEYS = [
 	"captions",
 	"filters",
 	"adjustment",
+	"automation",
 	"settings",
 ] as const;
 
@@ -71,6 +74,10 @@ export const tabs = {
 	adjustment: {
 		icon: createHugeiconsIcon({ icon: SlidersHorizontalIcon }),
 		label: "Adjustment",
+	},
+	automation: {
+		icon: createHugeiconsIcon({ icon: AiBrain01Icon }),
+		label: "Automation",
 	},
 	settings: {
 		icon: createHugeiconsIcon({ icon: Settings01Icon }),

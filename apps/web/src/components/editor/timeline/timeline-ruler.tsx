@@ -4,6 +4,7 @@ import { DEFAULT_FPS } from "@/constants/project-constants";
 import { useEditor } from "@/hooks/use-editor";
 import { getRulerConfig, shouldShowLabel } from "@/lib/timeline/ruler-utils";
 import { TimelineTick } from "./timeline-tick";
+import { AutomationPointMarkers } from "./automation-point-markers";
 
 interface TimelineRulerProps {
 	zoomLevel: number;
@@ -78,6 +79,7 @@ export function TimelineRuler({
 				onMouseDown={handleRulerMouseDown}
 			>
 				{timelineTicks}
+				<AutomationPointMarkers zoomLevel={zoomLevel} />
 			</div>
 		</div>
 	);

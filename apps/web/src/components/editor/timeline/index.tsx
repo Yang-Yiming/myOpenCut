@@ -8,6 +8,7 @@ import {
 	ViewOffSlashIcon,
 	VolumeHighIcon,
 	VolumeOffIcon,
+	PencilEdit02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
@@ -20,6 +21,7 @@ import { useTimelineZoom } from "@/hooks/timeline/use-timeline-zoom";
 import { useState, useRef, useCallback } from "react";
 import { TimelineTrackContent } from "./timeline-track";
 import { TimelinePlayhead } from "./timeline-playhead";
+import { TrackLabel } from "./track-label";
 import { SelectionBox } from "../selection-box";
 import { useSelectionBox } from "@/hooks/timeline/use-selection-box";
 import { SnapIndicator } from "./snap-indicator";
@@ -52,6 +54,7 @@ import { useEditor } from "@/hooks/use-editor";
 import { useTimelinePlayhead } from "@/hooks/timeline/use-timeline-playhead";
 import { DragLine } from "./drag-line";
 import { invokeAction } from "@/lib/actions";
+import { RenameTrackCommand } from "@/lib/commands";
 
 export function Timeline() {
 	const tracksContainerHeight = { min: 0, max: 800 };
@@ -244,12 +247,18 @@ export function Timeline() {
 										{tracks.map((track) => (
 											<div
 												key={track.id}
-												className="group flex items-center px-3"
+												className="group flex items-center gap-2 px-3"
 												style={{
 													height: `${getTrackHeight({ type: track.type })}px`,
 												}}
 											>
-												<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+												<div className="flex min-w-0 flex-1 items-center gap-2">
+													<TrackIcon track={track} />
+													<div className="min-w-0 flex-1">
+														<TrackLabel track={track} allTracks={tracks} />
+													</div>
+												</div>
+												<div className="flex items-center gap-1">
 													{process.env.NODE_ENV === "development" &&
 														isMainTrack(track) && (
 															<div className="bg-red-500 size-1.5 rounded-full" />
@@ -282,7 +291,6 @@ export function Timeline() {
 															}
 														/>
 													)}
-													<TrackIcon track={track} />
 												</div>
 											</div>
 										))}
@@ -441,6 +449,23 @@ export function Timeline() {
 														}}
 													>
 														Paste elements
+													</ContextMenuItem>
+													<ContextMenuItem
+														icon={<HugeiconsIcon icon={PencilEdit02Icon} />}
+														onClick={(e) => {
+															e.stopPropagation();
+															const newName = prompt(
+																"Enter new track name:",
+																track.name,
+															);
+															if (newName && newName.trim() !== track.name) {
+																editor.command.execute(
+																	new RenameTrackCommand(track.id, newName.trim()),
+																);
+															}
+														}}
+													>
+														Rename track
 													</ContextMenuItem>
 													<ContextMenuItem
 														onClick={(e) => {

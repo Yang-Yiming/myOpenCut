@@ -3,6 +3,7 @@
 import { useEditor } from "@/hooks/use-editor";
 import { useAssetsPanelStore } from "@/stores/assets-panel-store";
 import AudioWaveform from "./audio-waveform";
+import { AutomationMarkerBadge } from "./automation-marker-badge";
 import { useTimelineElementResize } from "@/hooks/timeline/element/use-element-resize";
 import type { SnapPoint } from "@/hooks/timeline/use-timeline-snapping";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
@@ -28,6 +29,7 @@ import type {
 import type { MediaAsset } from "@/types/assets";
 import { mediaSupportsAudio } from "@/lib/media/media-utils";
 import { getActionDefinition, type TAction, invokeAction } from "@/lib/actions";
+import { RemoveAutomationMarkerCommand } from "@/lib/commands";
 import { useElementSelection } from "@/hooks/timeline/element/use-element-selection";
 import Image from "next/image";
 import {
@@ -163,6 +165,7 @@ export function TimelineElement({
 						onElementMouseDown={onElementMouseDown}
 						handleResizeStart={handleResizeStart}
 					/>
+					<AutomationMarkerBadge trackId={track.id} elementId={element.id} />
 				</div>
 			</ContextMenuTrigger>
 			<ContextMenuContent className="z-200 w-64">
@@ -205,6 +208,28 @@ export function TimelineElement({
 						</ContextMenuItem>
 					</>
 				)}
+				{(() => {
+					const automationMarkers = editor.automation.getMarkersForElement(
+						track.id,
+						element.id,
+					);
+					if (automationMarkers.length === 0) return null;
+
+					return (
+						<ContextMenuItem
+							icon={<HugeiconsIcon icon={Delete02Icon} />}
+							onClick={() => {
+								for (const marker of automationMarkers) {
+									editor.command.execute(
+										new RemoveAutomationMarkerCommand(marker.id),
+									);
+								}
+							}}
+						>
+							Remove Automation ({automationMarkers.length})
+						</ContextMenuItem>
+					);
+				})()}
 				<ContextMenuSeparator />
 				<DeleteMenuItem
 					isMultipleSelected={selectedElements.length > 1}
