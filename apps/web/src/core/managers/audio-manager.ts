@@ -32,6 +32,8 @@ export class AudioManager {
 	private lastIsPlaying = false;
 	private lastVolume = 1;
 	private unsubscribers: Array<() => void> = [];
+	private scheduledOneshotIds = new Set<string>();
+	private oneshotBuffers = new Map<string, AudioBuffer>();
 
 	constructor(private editor: EditorCore) {
 		this.lastVolume = this.editor.playback.getVolume();
@@ -179,6 +181,85 @@ export class AudioManager {
 			this.activeClipIds.add(clip.id);
 			void this.runClipIterator({ clip, startTime: currentTime, sessionId: this.playbackSessionId });
 		}
+
+		// Schedule oneshot markers
+		this.scheduleOneshotMarkers(currentTime, windowEnd);
+	}
+
+	private scheduleOneshotMarkers(currentTime: number, windowEnd: number): void {
+		const audioContext = this.audioContext;
+		if (!audioContext || !this.masterGain) return;
+
+		const markersInWindow = this.editor.oneshot.getMarkersInTimeWindow(
+			currentTime,
+			windowEnd,
+		);
+
+		for (const { marker, definition, audioStartTime } of markersInWindow) {
+			if (this.scheduledOneshotIds.has(marker.id)) continue;
+			if (audioStartTime < currentTime - 0.1) continue;
+
+			this.scheduledOneshotIds.add(marker.id);
+			void this.playOneshotMarker(marker, definition, audioStartTime);
+		}
+	}
+
+	private async playOneshotMarker(
+		marker: { id: string; volume?: number },
+		definition: { id: string; audioSource: { url: string }; trimStart: number; trimEnd: number },
+		audioStartTime: number,
+	): Promise<void> {
+		const audioContext = this.audioContext;
+		if (!audioContext || !this.masterGain) return;
+
+		// Get or load audio buffer
+		let buffer = this.oneshotBuffers.get(definition.id);
+		if (!buffer) {
+			const loadedBuffer = await this.editor.oneshot.loadAudioBuffer(definition.id);
+			if (!loadedBuffer) return;
+			buffer = loadedBuffer;
+			this.oneshotBuffers.set(definition.id, buffer);
+		}
+
+		if (!this.editor.playback.getIsPlaying()) return;
+
+		const source = audioContext.createBufferSource();
+		source.buffer = buffer;
+
+		// Create gain node for volume control
+		const gainNode = audioContext.createGain();
+		gainNode.gain.value = marker.volume ?? 1;
+		source.connect(gainNode);
+		gainNode.connect(this.masterGain);
+
+		// Calculate when to start in audio context time
+		const contextStartTime =
+			this.playbackStartContextTime +
+			(audioStartTime - this.playbackStartTime);
+
+		const sliceDuration = definition.trimEnd - definition.trimStart;
+
+		if (contextStartTime >= audioContext.currentTime) {
+			source.start(contextStartTime, definition.trimStart, sliceDuration);
+		} else {
+			const offset = audioContext.currentTime - contextStartTime;
+			if (offset < sliceDuration) {
+				source.start(
+					audioContext.currentTime,
+					definition.trimStart + offset,
+					sliceDuration - offset,
+				);
+			} else {
+				return;
+			}
+		}
+
+		this.queuedSources.add(source);
+		source.addEventListener("ended", () => {
+			source.disconnect();
+			gainNode.disconnect();
+			this.queuedSources.delete(source);
+		});
 	}
 
 	private stopPlayback(): void {
@@ -197,6 +278,7 @@ export class AudioManager {
 		}
 		this.clipIterators.clear();
 		this.activeClipIds.clear();
+		this.scheduledOneshotIds.clear();
 
 		for (const source of this.queuedSources) {
 			try {

@@ -2,11 +2,12 @@
 
 import { useTimelineStore } from "@/stores/timeline-store";
 import { useAutomationStore } from "@/stores/automation-store";
+import { useOneshotStore } from "@/stores/oneshot-store";
 import { useActionHandler } from "@/hooks/actions/use-action-handler";
 import { useEditor } from "../use-editor";
 import { useElementSelection } from "../timeline/element/use-element-selection";
 import { getElementsAtTime } from "@/lib/timeline";
-import { AddAutomationMarkerCommand } from "@/lib/commands";
+import { AddAutomationMarkerCommand, CreateOneshotMarkerCommand } from "@/lib/commands";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -296,6 +297,33 @@ export function useEditorActions() {
 					}),
 				);
 			}
+
+			// Exit mark mode after marking
+			exitMarkMode();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"mark-oneshot",
+		() => {
+			const { isMarkModeActive, activeOneshotId, exitMarkMode, openOneshotSelection } =
+				useOneshotStore.getState();
+
+			if (!isMarkModeActive || !activeOneshotId) {
+				// Not in mark mode, show oneshot selection dialog
+				openOneshotSelection();
+				return;
+			}
+
+			// Place marker at current playhead time
+			const currentTime = editor.playback.getCurrentTime();
+			editor.command.execute(
+				new CreateOneshotMarkerCommand({
+					oneshotId: activeOneshotId,
+					time: currentTime,
+				}),
+			);
 
 			// Exit mark mode after marking
 			exitMarkMode();

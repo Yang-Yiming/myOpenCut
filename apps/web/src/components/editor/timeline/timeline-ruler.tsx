@@ -5,6 +5,7 @@ import { useEditor } from "@/hooks/use-editor";
 import { getRulerConfig, shouldShowLabel } from "@/lib/timeline/ruler-utils";
 import { TimelineTick } from "./timeline-tick";
 import { AutomationPointMarkers } from "./automation-point-markers";
+import { OneshotTimelineMarkers } from "./oneshot-timeline-markers";
 
 interface TimelineRulerProps {
 	zoomLevel: number;
@@ -80,6 +81,7 @@ export function TimelineRuler({
 			>
 				{timelineTicks}
 				<AutomationPointMarkers zoomLevel={zoomLevel} />
+				<OneshotTimelineMarkers zoomLevel={zoomLevel} />
 			</div>
 		</div>
 	);

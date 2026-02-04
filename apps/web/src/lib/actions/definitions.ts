@@ -137,6 +137,11 @@ export const ACTIONS = {
 		category: "timeline",
 		defaultShortcuts: ["h"],
 	},
+	"mark-oneshot": {
+		description: "Mark oneshot at playhead",
+		category: "timeline",
+		defaultShortcuts: ["o"],
+	},
 	undo: {
 		description: "Undo",
 		category: "history",

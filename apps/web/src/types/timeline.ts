@@ -1,4 +1,5 @@
 import type { AutomationMarker, AutomationState } from "./automation";
+import type { OneshotDefinition, OneshotMarker } from "./oneshot";
 
 export interface TScene {
 	id: string;
@@ -8,6 +9,8 @@ export interface TScene {
 	bookmarks: number[];
 	automationStates?: AutomationState[];
 	automationMarkers?: AutomationMarker[];
+	oneshotDefinitions?: OneshotDefinition[];
+	oneshotMarkers?: OneshotMarker[];
 	createdAt: Date;
 	updatedAt: Date;
 }

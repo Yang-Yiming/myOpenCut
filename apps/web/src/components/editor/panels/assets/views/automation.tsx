@@ -4,6 +4,12 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
+	Tabs,
+	TabsList,
+	TabsTrigger,
+	TabsContent,
+} from "@/components/ui/tabs";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
@@ -22,26 +28,51 @@ import { useState, useEffect } from "react";
 import { AutomationStateDialog } from "@/components/editor/dialogs/automation-state-dialog";
 import { AutomationStateSelectionDialog } from "@/components/editor/dialogs/automation-state-selection-dialog";
 import { getTrackDisplayName } from "@/lib/timeline/track-utils";
+import { OneshotView } from "./oneshot-view";
 
 export function AutomationView() {
 	const { startCreatingState } = useAutomationStore();
 
 	return (
 		<div className="flex h-full flex-col">
-			{/* Header with Create button */}
-			<div className="px-3 pt-4 pb-2">
-				<Button onClick={startCreatingState} className="w-full">
-					<HugeiconsIcon icon={PlusSignIcon} />
-					Create State
-				</Button>
-			</div>
+			{/* Tabs */}
+			<Tabs defaultValue="state" className="flex h-full flex-col">
+				<div className="px-3 pt-4 pb-2">
+					<TabsList className="w-full">
+						<TabsTrigger value="state" className="flex-1">
+							State
+						</TabsTrigger>
+						<TabsTrigger value="oneshot" className="flex-1">
+							Oneshot
+						</TabsTrigger>
+					</TabsList>
+				</div>
 
-			<Separator className="my-4" />
+				<Separator className="my-2" />
 
-			{/* States list */}
-			<ScrollArea className="flex-1 px-5">
-				<AutomationStatesList />
-			</ScrollArea>
+				{/* State Tab Content */}
+				<TabsContent value="state" className="flex-1 flex flex-col mt-0">
+					{/* Header with Create button */}
+					<div className="px-3 pb-2">
+						<Button onClick={startCreatingState} className="w-full">
+							<HugeiconsIcon icon={PlusSignIcon} />
+							Create State
+						</Button>
+					</div>
+
+					<Separator className="my-4" />
+
+					{/* States list */}
+					<ScrollArea className="flex-1 px-5">
+						<AutomationStatesList />
+					</ScrollArea>
+				</TabsContent>
+
+				{/* Oneshot Tab Content */}
+				<TabsContent value="oneshot" className="flex-1 flex flex-col mt-0">
+					<OneshotView />
+				</TabsContent>
+			</Tabs>
 
 			{/* Dialog for creating/editing states */}
 			<AutomationStateDialog />
