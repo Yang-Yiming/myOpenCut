@@ -15,6 +15,7 @@ export class AudioManager {
 	private playbackStartTime = 0;
 	private playbackStartContextTime = 0;
 	private scheduleTimer: number | null = null;
+	private volumeUpdateTimer: number | null = null;
 	private lookaheadSeconds = 2;
 	private scheduleIntervalMs = 500;
 	private clips: AudioClipSource[] = [];
@@ -26,6 +27,7 @@ export class AudioManager {
 		AsyncGenerator<WrappedAudioBuffer, void, unknown>
 	>();
 	private queuedSources = new Set<AudioBufferSourceNode>();
+	private clipGains = new Map<string, GainNode>();
 	private playbackSessionId = 0;
 	private lastIsPlaying = false;
 	private lastVolume = 1;
@@ -153,6 +155,10 @@ export class AudioManager {
 			this.scheduleTimer = window.setInterval(() => {
 				this.scheduleUpcomingClips();
 			}, this.scheduleIntervalMs);
+
+			this.volumeUpdateTimer = window.setInterval(() => {
+				this.updateClipVolumes();
+			}, 100);
 		}
 	}
 
@@ -181,6 +187,11 @@ export class AudioManager {
 		}
 		this.scheduleTimer = null;
 
+		if (this.volumeUpdateTimer && typeof window !== "undefined") {
+			window.clearInterval(this.volumeUpdateTimer);
+		}
+		this.volumeUpdateTimer = null;
+
 		for (const iterator of this.clipIterators.values()) {
 			void iterator.return();
 		}
@@ -194,6 +205,7 @@ export class AudioManager {
 			source.disconnect();
 		}
 		this.queuedSources.clear();
+		this.clipGains.clear();
 	}
 
 	private async runClipIterator({
@@ -211,6 +223,21 @@ export class AudioManager {
 		const sink = await this.getAudioSink({ clip });
 		if (!sink || !this.editor.playback.getIsPlaying()) return;
 		if (sessionId !== this.playbackSessionId) return;
+
+		// Create per-clip gain node for automation volume control
+		const clipGain = audioContext.createGain();
+		clipGain.connect(this.masterGain ?? audioContext.destination);
+		this.clipGains.set(clip.id, clipGain);
+
+		// Set initial volume from automation
+		const initialTime = Math.max(startTime, clip.startTime);
+		const initialVolume = this.editor.automation.getEffectiveVolumeForTrack(
+			clip.trackId,
+			clip.id,
+			initialTime,
+			clip.baseVolume * 100,
+		);
+		clipGain.gain.value = initialVolume / 100;
 
 		const clipStart = clip.startTime;
 		const clipDuration = clip.duration;
@@ -251,7 +278,7 @@ export class AudioManager {
 
 					const node = audioContext.createBufferSource();
 					node.buffer = buffer;
-					node.connect(this.masterGain ?? audioContext.destination);
+					node.connect(clipGain);
 
 					const startTimestamp =
 						this.playbackStartContextTime +
@@ -328,6 +355,22 @@ export class AudioManager {
 				}
 			}, 100);
 		});
+	}
+
+	private updateClipVolumes(): void {
+		const currentTime = this.getPlaybackTime();
+		for (const clip of this.clips) {
+			const clipGain = this.clipGains.get(clip.id);
+			if (!clipGain) continue;
+
+			const effectiveVolume = this.editor.automation.getEffectiveVolumeForTrack(
+				clip.trackId,
+				clip.id,
+				currentTime,
+				clip.baseVolume * 100,
+			);
+			clipGain.gain.value = effectiveVolume / 100;
+		}
 	}
 
 	private disposeSinks(): void {

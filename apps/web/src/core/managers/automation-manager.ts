@@ -7,7 +7,7 @@ import type {
 	RangeMarker,
 } from "@/types/automation";
 import { nanoid } from "nanoid";
-import { getEffectiveVolume } from "@/lib/automation/apply-automation";
+import { getEffectiveVolume, type ElementTimeRange } from "@/lib/automation/apply-automation";
 
 export class AutomationManager {
 	private listeners = new Set<() => void>();
@@ -249,6 +249,20 @@ export class AutomationManager {
 		const markers = this.getMarkers();
 		const states = this.getStates();
 
+		// Collect element time ranges for range marker resolution
+		const elementTimeRanges: ElementTimeRange[] = [];
+		const tracks = this.editor.timeline.getTracks();
+		for (const track of tracks) {
+			for (const element of track.elements) {
+				elementTimeRanges.push({
+					trackId: track.id,
+					elementId: element.id,
+					startTime: element.startTime,
+					endTime: element.startTime + element.duration,
+				});
+			}
+		}
+
 		return getEffectiveVolume(
 			trackId,
 			elementId,
@@ -256,6 +270,7 @@ export class AutomationManager {
 			baseVolume,
 			markers,
 			states,
+			elementTimeRanges,
 		);
 	}
 

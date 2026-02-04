@@ -147,6 +147,7 @@ interface AudioMixSource {
 
 export interface AudioClipSource {
 	id: string;
+	trackId: string;
 	sourceKey: string;
 	file: File;
 	startTime: number;
@@ -155,6 +156,7 @@ export interface AudioClipSource {
 	trimEnd: number;
 	muted: boolean;
 	loop?: boolean;
+	baseVolume: number;
 }
 
 async function fetchLibraryAudioSource({
@@ -188,12 +190,16 @@ async function fetchLibraryAudioSource({
 
 async function fetchLibraryAudioClip({
 	element,
+	trackId,
 	muted,
 	loop = false,
+	baseVolume,
 }: {
 	element: LibraryAudioElement;
+	trackId: string;
 	muted: boolean;
 	loop?: boolean;
+	baseVolume: number;
 }): Promise<AudioClipSource | null> {
 	try {
 		const response = await fetch(element.sourceUrl);
@@ -208,6 +214,7 @@ async function fetchLibraryAudioClip({
 
 		return {
 			id: element.id,
+			trackId,
 			sourceKey: element.id,
 			file,
 			startTime: element.startTime,
@@ -216,6 +223,7 @@ async function fetchLibraryAudioClip({
 			trimEnd: element.trimEnd,
 			muted,
 			loop,
+			baseVolume,
 		};
 	} catch (error) {
 		console.warn("Failed to fetch library audio:", error);
@@ -241,17 +249,22 @@ function collectMediaAudioSource({
 
 function collectMediaAudioClip({
 	element,
+	trackId,
 	mediaAsset,
 	muted,
 	loop = false,
+	baseVolume,
 }: {
 	element: TimelineElement;
+	trackId: string;
 	mediaAsset: MediaAsset;
 	muted: boolean;
 	loop?: boolean;
+	baseVolume: number;
 }): AudioClipSource {
 	return {
 		id: element.id,
+		trackId,
 		sourceKey: mediaAsset.id,
 		file: mediaAsset.file,
 		startTime: element.startTime,
@@ -260,6 +273,7 @@ function collectMediaAudioClip({
 		trimEnd: element.trimEnd,
 		muted,
 		loop,
+		baseVolume,
 	};
 }
 
@@ -341,6 +355,7 @@ export async function collectAudioClips({
 			const muted = isTrackMuted || isElementMuted;
 
 			if (element.type === "audio") {
+				const baseVolume = element.volume ?? 1;
 				if (element.sourceType === "upload") {
 					const mediaAsset = mediaMap.get(element.mediaId);
 					if (!mediaAsset) continue;
@@ -348,17 +363,21 @@ export async function collectAudioClips({
 					clips.push(
 						collectMediaAudioClip({
 							element,
+							trackId: track.id,
 							mediaAsset,
 							muted,
 							loop: element.loop ?? false,
+							baseVolume,
 						}),
 					);
 				} else {
 					pendingLibraryClips.push(
 						fetchLibraryAudioClip({
 							element,
+							trackId: track.id,
 							muted,
 							loop: element.loop ?? false,
+							baseVolume,
 						}),
 					);
 				}
@@ -373,8 +392,10 @@ export async function collectAudioClips({
 					clips.push(
 						collectMediaAudioClip({
 							element,
+							trackId: track.id,
 							mediaAsset,
 							muted,
+							baseVolume: 1,
 						}),
 					);
 				}
