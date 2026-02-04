@@ -9,6 +9,7 @@ interface AutomationStore {
 	selectedStateId: string | null;
 	isCreatingState: boolean;
 	editingStateId: string | null;
+	isStateSelectionOpen: boolean;
 
 	// Actions
 	enterMarkMode: (stateId: string) => void;
@@ -18,6 +19,8 @@ interface AutomationStore {
 	cancelCreatingState: () => void;
 	startEditingState: (stateId: string) => void;
 	cancelEditingState: () => void;
+	openStateSelection: () => void;
+	closeStateSelection: () => void;
 }
 
 export const useAutomationStore = create<AutomationStore>((set) => ({
@@ -27,6 +30,7 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
 	selectedStateId: null,
 	isCreatingState: false,
 	editingStateId: null,
+	isStateSelectionOpen: false,
 
 	// Actions
 	enterMarkMode: (stateId: string) =>
@@ -66,5 +70,15 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
 	cancelEditingState: () =>
 		set({
 			editingStateId: null,
+		}),
+
+	openStateSelection: () =>
+		set({
+			isStateSelectionOpen: true,
+		}),
+
+	closeStateSelection: () =>
+		set({
+			isStateSelectionOpen: false,
 		}),
 }));

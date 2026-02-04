@@ -264,11 +264,13 @@ export function useEditorActions() {
 	useActionHandler(
 		"mark-automation",
 		() => {
-			const { isMarkModeActive, activeMarkStateId, exitMarkMode } =
+			const { isMarkModeActive, activeMarkStateId, exitMarkMode, openStateSelection } =
 				useAutomationStore.getState();
 
 			if (!isMarkModeActive || !activeMarkStateId) {
-				return; // Not in mark mode, do nothing
+				// Not in mark mode, show state selection dialog
+				openStateSelection();
+				return;
 			}
 
 			if (selectedElements.length > 0) {

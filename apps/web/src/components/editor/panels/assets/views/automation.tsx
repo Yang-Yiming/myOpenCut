@@ -20,6 +20,7 @@ import {
 } from "@/lib/commands";
 import { useState, useEffect } from "react";
 import { AutomationStateDialog } from "@/components/editor/dialogs/automation-state-dialog";
+import { AutomationStateSelectionDialog } from "@/components/editor/dialogs/automation-state-selection-dialog";
 import { getTrackDisplayName } from "@/lib/timeline/track-utils";
 
 export function AutomationView() {
@@ -44,6 +45,9 @@ export function AutomationView() {
 
 			{/* Dialog for creating/editing states */}
 			<AutomationStateDialog />
+
+			{/* Dialog for selecting state when pressing H without mark mode */}
+			<AutomationStateSelectionDialog />
 		</div>
 	);
 }
