@@ -220,7 +220,7 @@ export class AutomationManager {
 				activeMarkers.push(marker);
 			} else if (marker.type === "range") {
 				// Check if the element at this time is active
-				const track = this.editor.timeline.getTrackById(marker.trackId);
+				const track = this.editor.timeline.getTrackById({ trackId: marker.trackId });
 				if (!track) continue;
 
 				const element = track.elements.find((e) => e.id === marker.elementId);
