@@ -8,4 +8,5 @@ export { SplitElementsCommand } from "./split-elements";
 export { UpdateTextElementCommand } from "./update-text-element";
 export { ToggleElementsVisibilityCommand } from "./toggle-elements-visibility";
 export { ToggleElementsMutedCommand } from "./toggle-elements-muted";
+export { ToggleAudioLoopCommand } from "./toggle-audio-loop";
 export { MoveElementCommand } from "./move-elements";

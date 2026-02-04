@@ -19,6 +19,7 @@ import {
 	DuplicateElementsCommand,
 	ToggleElementsVisibilityCommand,
 	ToggleElementsMutedCommand,
+	ToggleAudioLoopCommand,
 	UpdateTextElementCommand,
 	SplitElementsCommand,
 	PasteCommand,
@@ -252,6 +253,15 @@ export class TimelineManager {
 		elements: { trackId: string; elementId: string }[];
 	}): void {
 		const command = new ToggleElementsMutedCommand(elements);
+		this.editor.command.execute(command);
+	}
+
+	toggleAudioLoop({
+		elements,
+	}: {
+		elements: { trackId: string; elementId: string }[];
+	}): void {
+		const command = new ToggleAudioLoopCommand(elements);
 		this.editor.command.execute(command);
 	}
 

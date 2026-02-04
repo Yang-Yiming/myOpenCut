@@ -12,7 +12,7 @@ import { mediaSupportsAudio } from "@/lib/media/media-utils";
 export type CollectedAudioElement = Omit<
 	AudioElement,
 	"type" | "mediaId" | "volume" | "id" | "name" | "sourceType" | "sourceUrl"
-> & { buffer: AudioBuffer };
+> & { buffer: AudioBuffer; loop?: boolean };
 
 export function createAudioContext(): AudioContext {
 	const AudioContextConstructor =
@@ -89,6 +89,7 @@ export async function collectAudioElements({
 						trimStart: element.trimStart,
 						trimEnd: element.trimEnd,
 						muted: element.muted || isTrackMuted,
+						loop: element.loop ?? false,
 					};
 				}),
 			);
@@ -153,6 +154,7 @@ export interface AudioClipSource {
 	trimStart: number;
 	trimEnd: number;
 	muted: boolean;
+	loop?: boolean;
 }
 
 async function fetchLibraryAudioSource({
@@ -187,9 +189,11 @@ async function fetchLibraryAudioSource({
 async function fetchLibraryAudioClip({
 	element,
 	muted,
+	loop = false,
 }: {
 	element: LibraryAudioElement;
 	muted: boolean;
+	loop?: boolean;
 }): Promise<AudioClipSource | null> {
 	try {
 		const response = await fetch(element.sourceUrl);
@@ -211,6 +215,7 @@ async function fetchLibraryAudioClip({
 			trimStart: element.trimStart,
 			trimEnd: element.trimEnd,
 			muted,
+			loop,
 		};
 	} catch (error) {
 		console.warn("Failed to fetch library audio:", error);
@@ -238,10 +243,12 @@ function collectMediaAudioClip({
 	element,
 	mediaAsset,
 	muted,
+	loop = false,
 }: {
 	element: TimelineElement;
 	mediaAsset: MediaAsset;
 	muted: boolean;
+	loop?: boolean;
 }): AudioClipSource {
 	return {
 		id: element.id,
@@ -252,6 +259,7 @@ function collectMediaAudioClip({
 		trimStart: element.trimStart,
 		trimEnd: element.trimEnd,
 		muted,
+		loop,
 	};
 }
 
@@ -342,10 +350,17 @@ export async function collectAudioClips({
 							element,
 							mediaAsset,
 							muted,
+							loop: element.loop ?? false,
 						}),
 					);
 				} else {
-					pendingLibraryClips.push(fetchLibraryAudioClip({ element, muted }));
+					pendingLibraryClips.push(
+						fetchLibraryAudioClip({
+							element,
+							muted,
+							loop: element.loop ?? false,
+						}),
+					);
 				}
 				continue;
 			}
@@ -431,7 +446,7 @@ function mixAudioChannels({
 	outputLength: number;
 	sampleRate: number;
 }): void {
-	const { buffer, startTime, trimStart, duration: elementDuration } = element;
+	const { buffer, startTime, trimStart, duration: elementDuration, loop } = element;
 
 	const sourceStartSample = Math.floor(trimStart * buffer.sampleRate);
 	const sourceLengthSamples = Math.floor(elementDuration * buffer.sampleRate);
@@ -440,17 +455,24 @@ function mixAudioChannels({
 	const resampleRatio = sampleRate / buffer.sampleRate;
 	const resampledLength = Math.floor(sourceLengthSamples * resampleRatio);
 
+	// For looping clips, write until end of timeline; otherwise just the clip duration
+	const maxOutputSamples = loop ? (outputLength - outputStartSample) : resampledLength;
+
 	const outputChannels = 2;
 	for (let channel = 0; channel < outputChannels; channel++) {
 		const outputData = outputBuffer.getChannelData(channel);
 		const sourceChannel = Math.min(channel, buffer.numberOfChannels - 1);
 		const sourceData = buffer.getChannelData(sourceChannel);
 
-		for (let i = 0; i < resampledLength; i++) {
+		for (let i = 0; i < maxOutputSamples; i++) {
 			const outputIndex = outputStartSample + i;
 			if (outputIndex >= outputLength) break;
 
-			const sourceIndex = sourceStartSample + Math.floor(i / resampleRatio);
+			// For looping clips, wrap the source index using modulo
+			const sourceOffset = loop && resampledLength > 0
+				? i % resampledLength
+				: i;
+			const sourceIndex = sourceStartSample + Math.floor(sourceOffset / resampleRatio);
 			if (sourceIndex >= sourceData.length) break;
 
 			outputData[outputIndex] += sourceData[sourceIndex];

@@ -119,6 +119,11 @@ export const ACTIONS = {
 		description: "Mute/unmute selected elements",
 		category: "selection",
 	},
+	"toggle-audio-loop-selected": {
+		description: "Toggle audio loop",
+		category: "selection",
+		defaultShortcuts: ["shift+l"],
+	},
 	"toggle-elements-visibility-selected": {
 		description: "Show/hide selected elements",
 		category: "selection",

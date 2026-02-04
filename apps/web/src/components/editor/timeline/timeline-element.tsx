@@ -43,6 +43,7 @@ import {
 	VolumeMute02Icon,
 	Search01Icon,
 	Exchange01Icon,
+	RepeatIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { uppercase } from "@/utils/string";
@@ -180,6 +181,9 @@ export function TimelineElement({
 						isMuted={isMuted}
 					/>
 				)}
+				{element.type === "audio" && (
+					<LoopMenuItem isLooping={element.loop ?? false} />
+				)}
 				{canElementBeHidden(element) && (
 					<VisibilityMenuItem
 						element={element}
@@ -310,6 +314,15 @@ function ElementInner({
 								className="size-6 text-white"
 							/>
 						)}
+					</div>
+				)}
+
+				{element.type === "audio" && element.loop && (
+					<div className="pointer-events-none absolute right-1 top-1">
+						<HugeiconsIcon
+							icon={RepeatIcon}
+							className="size-4 text-white drop-shadow-md"
+						/>
 					</div>
 				)}
 			</button>
@@ -500,6 +513,18 @@ function MuteMenuItem({
 	return (
 		<ActionMenuItem action="toggle-elements-muted-selected" icon={getIcon()}>
 			{isMuted ? "Unmute" : "Mute"}
+		</ActionMenuItem>
+	);
+}
+
+function LoopMenuItem({
+	isLooping,
+}: {
+	isLooping: boolean;
+}) {
+	return (
+		<ActionMenuItem action="toggle-audio-loop-selected" icon={<HugeiconsIcon icon={RepeatIcon} />}>
+			{isLooping ? "Disable Loop" : "Enable Loop"}
 		</ActionMenuItem>
 	);
 }

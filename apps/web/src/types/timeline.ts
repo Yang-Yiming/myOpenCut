@@ -61,6 +61,7 @@ interface BaseAudioElement extends BaseTimelineElement {
 	volume: number;
 	muted?: boolean;
 	buffer?: AudioBuffer;
+	loop?: boolean;
 }
 
 export interface UploadAudioElement extends BaseAudioElement {

@@ -238,6 +238,14 @@ export function useEditorActions() {
 	);
 
 	useActionHandler(
+		"toggle-audio-loop-selected",
+		() => {
+			editor.timeline.toggleAudioLoop({ elements: selectedElements });
+		},
+		undefined,
+	);
+
+	useActionHandler(
 		"toggle-elements-visibility-selected",
 		() => {
 			editor.timeline.toggleElementsVisibility({ elements: selectedElements });

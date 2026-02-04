@@ -213,53 +213,81 @@ export class AudioManager {
 		if (sessionId !== this.playbackSessionId) return;
 
 		const clipStart = clip.startTime;
-		const clipEnd = clip.startTime + clip.duration;
+		const clipDuration = clip.duration;
+		const totalDuration = this.editor.timeline.getTotalDuration();
+
+		// For looping clips, effective end is timeline end; otherwise it's clip end
+		const effectiveEnd = clip.loop ? totalDuration : clipStart + clipDuration;
 
 		const iteratorStartTime = Math.max(startTime, clipStart);
-		const sourceStartTime =
-			clip.trimStart + (iteratorStartTime - clip.startTime);
 
-		const iterator = sink.buffers(sourceStartTime);
+		// Calculate which loop iteration we're starting in
+		let loopIteration = 0;
+		let positionInLoop = iteratorStartTime - clipStart;
+
+		if (clip.loop && clipDuration > 0) {
+			loopIteration = Math.floor((iteratorStartTime - clipStart) / clipDuration);
+			positionInLoop = (iteratorStartTime - clipStart) % clipDuration;
+		}
+
+		let sourceStartTime = clip.trimStart + positionInLoop;
+		let iterator = sink.buffers(sourceStartTime);
 		this.clipIterators.set(clip.id, iterator);
 
 		try {
-			for await (const { buffer, timestamp } of iterator) {
-				if (!this.editor.playback.getIsPlaying()) return;
-				if (sessionId !== this.playbackSessionId) return;
+			while (true) {
+				for await (const { buffer, timestamp } of iterator) {
+					if (!this.editor.playback.getIsPlaying()) return;
+					if (sessionId !== this.playbackSessionId) return;
 
-				const timelineTime = clip.startTime + (timestamp - clip.trimStart);
-				if (timelineTime >= clipEnd) break;
+					// Calculate position within the current loop
+					const sourceOffset = timestamp - clip.trimStart;
 
-				const node = audioContext.createBufferSource();
-				node.buffer = buffer;
-				node.connect(this.masterGain ?? audioContext.destination);
+					// Map source time to timeline time accounting for loop iteration
+					const timelineTime = clipStart + (loopIteration * clipDuration) + sourceOffset;
 
-				const startTimestamp =
-					this.playbackStartContextTime +
-					(timelineTime - this.playbackStartTime);
+					// Stop if we've reached the effective end
+					if (timelineTime >= effectiveEnd) return;
 
-				if (startTimestamp >= audioContext.currentTime) {
-					node.start(startTimestamp);
-				} else {
-					const offset = audioContext.currentTime - startTimestamp;
-					if (offset < buffer.duration) {
-						node.start(audioContext.currentTime, offset);
+					const node = audioContext.createBufferSource();
+					node.buffer = buffer;
+					node.connect(this.masterGain ?? audioContext.destination);
+
+					const startTimestamp =
+						this.playbackStartContextTime +
+						(timelineTime - this.playbackStartTime);
+
+					if (startTimestamp >= audioContext.currentTime) {
+						node.start(startTimestamp);
 					} else {
-						continue;
+						const offset = audioContext.currentTime - startTimestamp;
+						if (offset < buffer.duration) {
+							node.start(audioContext.currentTime, offset);
+						} else {
+							continue;
+						}
+					}
+
+					this.queuedSources.add(node);
+					node.addEventListener("ended", () => {
+						node.disconnect();
+						this.queuedSources.delete(node);
+					});
+
+					const aheadTime = timelineTime - this.getPlaybackTime();
+					if (aheadTime >= 1) {
+						await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
+						if (sessionId !== this.playbackSessionId) return;
 					}
 				}
 
-				this.queuedSources.add(node);
-				node.addEventListener("ended", () => {
-					node.disconnect();
-					this.queuedSources.delete(node);
-				});
+				// If not looping, we're done after the first iteration
+				if (!clip.loop) break;
 
-				const aheadTime = timelineTime - this.getPlaybackTime();
-				if (aheadTime >= 1) {
-					await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
-					if (sessionId !== this.playbackSessionId) return;
-				}
+				// For looping clips, restart the iterator from the beginning
+				loopIteration++;
+				iterator = sink.buffers(clip.trimStart);
+				this.clipIterators.set(clip.id, iterator);
 			}
 		} catch (error) {
 			// Input may be disposed when timeline changes (e.g., muting a track)
