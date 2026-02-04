@@ -61,6 +61,7 @@ import { DragLine } from "./drag-line";
 import { invokeAction } from "@/lib/actions";
 import { RenameTrackCommand } from "@/lib/commands";
 import { usePanelStore } from "@/stores/panel-store";
+import { TimelineScrollProvider } from "@/contexts/timeline-scroll-context";
 
 export function Timeline() {
 	const tracksContainerHeight = { min: 0, max: 800 };
@@ -374,6 +375,7 @@ export function Timeline() {
 								saveScrollPosition();
 							}}
 						>
+						<TimelineScrollProvider scrollRef={tracksScrollRef}>
 							<div
 								className="relative"
 								style={{
@@ -538,6 +540,7 @@ export function Timeline() {
 									)}
 								</div>
 							</div>
+						</TimelineScrollProvider>
 						</ScrollArea>
 					</div>
 				</ResizablePanel>

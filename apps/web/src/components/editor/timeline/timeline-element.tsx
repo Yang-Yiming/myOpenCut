@@ -166,7 +166,12 @@ export function TimelineElement({
 						onElementMouseDown={onElementMouseDown}
 						handleResizeStart={handleResizeStart}
 					/>
-					<AutomationMarkerBadge trackId={track.id} elementId={element.id} />
+					<AutomationMarkerBadge
+						trackId={track.id}
+						elementId={element.id}
+						elementLeft={elementLeft}
+						elementWidth={elementWidth}
+					/>
 				</div>
 			</ContextMenuTrigger>
 			<ContextMenuContent className="z-200 w-64">
