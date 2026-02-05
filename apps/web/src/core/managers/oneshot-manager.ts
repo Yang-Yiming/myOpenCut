@@ -230,7 +230,14 @@ export class OneshotManager {
 		if (!definition) return null;
 
 		try {
-			const response = await fetch(definition.audioSource.url);
+			// Resolve the audio URL based on source type
+			const audioUrl = this.resolveAudioUrl(definition);
+			if (!audioUrl) {
+				console.error("Failed to resolve audio URL for oneshot:", definitionId);
+				return null;
+			}
+
+			const response = await fetch(audioUrl);
 			const arrayBuffer = await response.arrayBuffer();
 			const audioContext = new AudioContext();
 			const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -241,6 +248,24 @@ export class OneshotManager {
 			console.error("Failed to load audio buffer:", error);
 			return null;
 		}
+	}
+
+	private resolveAudioUrl(definition: OneshotDefinition): string | null {
+		const { audioSource } = definition;
+
+		if (audioSource.type === "upload") {
+			// For uploaded files, get the URL from MediaManager using fileId
+			const assets = this.editor.media.getAssets();
+			const asset = assets.find((a) => a.id === audioSource.fileId);
+			if (asset) {
+				return asset.url;
+			}
+			// Fallback to stored URL (may be stale blob URL)
+			return audioSource.url;
+		}
+
+		// For library sounds, use the stored URL directly
+		return audioSource.url;
 	}
 
 	getCachedAudioBuffer(definitionId: string): AudioBuffer | undefined {

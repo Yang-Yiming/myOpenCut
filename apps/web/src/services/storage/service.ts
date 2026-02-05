@@ -96,6 +96,8 @@ class StorageService {
 			bookmarks: scene.bookmarks,
 			automationStates: scene.automationStates,
 			automationMarkers: scene.automationMarkers,
+			oneshotDefinitions: scene.oneshotDefinitions,
+			oneshotMarkers: scene.oneshotMarkers,
 			createdAt: scene.createdAt.toISOString(),
 			updatedAt: scene.updatedAt.toISOString(),
 		}));
@@ -142,6 +144,8 @@ class StorageService {
 				bookmarks: scene.bookmarks ?? [],
 				automationStates: scene.automationStates ?? [],
 				automationMarkers: scene.automationMarkers ?? [],
+				oneshotDefinitions: scene.oneshotDefinitions ?? [],
+				oneshotMarkers: scene.oneshotMarkers ?? [],
 				createdAt: new Date(scene.createdAt),
 				updatedAt: new Date(scene.updatedAt),
 			})) ?? [];
