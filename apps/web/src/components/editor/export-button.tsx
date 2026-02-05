@@ -8,6 +8,12 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -15,7 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/utils/ui";
 import { getExportMimeType, getExportFileExtension } from "@/lib/export";
-import { Check, Copy, Download, RotateCcw, X } from "lucide-react";
+import { Check, Copy, Download, RotateCcw, X, ChevronDown, Clock } from "lucide-react";
 import {
 	EXPORT_FORMAT_VALUES,
 	EXPORT_QUALITY_VALUES,
@@ -26,48 +32,76 @@ import {
 import { PropertyGroup } from "@/components/editor/panels/properties/property-item";
 import { useEditor } from "@/hooks/use-editor";
 import { DEFAULT_EXPORT_OPTIONS } from "@/constants/export-constants";
+import { VariantExportDialog } from "@/components/editor/dialogs/variant-export-dialog";
 
 export function ExportButton() {
 	const [isExportPopoverOpen, setIsExportPopoverOpen] = useState(false);
+	const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
+	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const editor = useEditor();
 
-	const handleExport = () => {
+	const handleStandardExport = () => {
+		setIsDropdownOpen(false);
 		setIsExportPopoverOpen(true);
+	};
+
+	const handleVariantExport = () => {
+		setIsDropdownOpen(false);
+		setIsVariantDialogOpen(true);
 	};
 
 	const hasProject = !!editor.project.getActive();
 
 	return (
-		<Popover open={isExportPopoverOpen} onOpenChange={setIsExportPopoverOpen}>
-			<PopoverTrigger asChild>
-				<button
-					type="button"
-					className={cn(
-						"flex items-center gap-1.5 rounded-md bg-[#38BDF8] px-[0.12rem] py-[0.12rem] text-white",
-						hasProject
-							? "cursor-pointer"
-							: "cursor-not-allowed opacity-50",
-					)}
-					onClick={hasProject ? handleExport : undefined}
-					disabled={!hasProject}
-					onKeyDown={(event) => {
-						if (hasProject && (event.key === "Enter" || event.key === " ")) {
-							event.preventDefault();
-							handleExport();
-						}
-					}}
-				>
-					<div className="relative flex items-center gap-1.5 rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7] px-4 py-1 shadow-[0_1px_3px_0px_rgba(0,0,0,0.65)]">
-						<HugeiconsIcon icon={TransitionTopIcon} className="z-50 size-4" />
-						<span className="z-50 text-[0.875rem]">Export</span>
-						<div className="absolute top-0 left-0 z-10 flex size-full items-center justify-center rounded-[0.6rem] bg-linear-to-t from-white/0 to-white/50">
-							<div className="absolute top-[0.08rem] z-50 h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7]"></div>
+		<>
+			<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+				<DropdownMenuTrigger asChild>
+					<button
+						type="button"
+						className={cn(
+							"flex items-center gap-1.5 rounded-md bg-[#38BDF8] px-[0.12rem] py-[0.12rem] text-white",
+							hasProject
+								? "cursor-pointer"
+								: "cursor-not-allowed opacity-50",
+						)}
+						disabled={!hasProject}
+					>
+						<div className="relative flex items-center gap-1.5 rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7] px-4 py-1 shadow-[0_1px_3px_0px_rgba(0,0,0,0.65)]">
+							<HugeiconsIcon icon={TransitionTopIcon} className="z-50 size-4" />
+							<span className="z-50 text-[0.875rem]">Export</span>
+							<ChevronDown className="z-50 size-3" />
+							<div className="absolute top-0 left-0 z-10 flex size-full items-center justify-center rounded-[0.6rem] bg-linear-to-t from-white/0 to-white/50">
+								<div className="absolute top-[0.08rem] z-50 h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7]"></div>
+							</div>
 						</div>
-					</div>
-				</button>
-			</PopoverTrigger>
-			{hasProject && <ExportPopover onOpenChange={setIsExportPopoverOpen} />}
-		</Popover>
+					</button>
+				</DropdownMenuTrigger>
+				{hasProject && (
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem onClick={handleStandardExport}>
+							<Download className="size-4" />
+							Standard Export
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={handleVariantExport}>
+							<Clock className="size-4" />
+							Variant Export (Time Remap)
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				)}
+			</DropdownMenu>
+
+			<Popover open={isExportPopoverOpen} onOpenChange={setIsExportPopoverOpen}>
+				<PopoverTrigger asChild>
+					<span className="hidden" />
+				</PopoverTrigger>
+				{hasProject && <ExportPopover onOpenChange={setIsExportPopoverOpen} />}
+			</Popover>
+
+			<VariantExportDialog
+				isOpen={isVariantDialogOpen}
+				onOpenChange={setIsVariantDialogOpen}
+			/>
+		</>
 	);
 }
 

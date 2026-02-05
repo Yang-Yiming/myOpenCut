@@ -1,5 +1,6 @@
 import type { TimelineTrack } from "@/types/timeline";
 import type { MediaAsset } from "@/types/assets";
+import type { TimeRemapConfig } from "@/types/time-remap";
 import { RootNode } from "./nodes/root-node";
 import { VideoNode } from "./nodes/video-node";
 import { ImageNode } from "./nodes/image-node";
@@ -10,6 +11,7 @@ import { BlurBackgroundNode } from "./nodes/blur-background-node";
 import type { TBackground, TCanvasSize } from "@/types/project";
 import { DEFAULT_BLUR_INTENSITY } from "@/constants/project-constants";
 import { isMainTrack } from "@/lib/timeline";
+import { getTrackBehavior, remapTime } from "@/lib/time-remap";
 
 export type BuildSceneParams = {
 	canvasSize: TCanvasSize;
@@ -17,10 +19,11 @@ export type BuildSceneParams = {
 	mediaAssets: MediaAsset[];
 	duration: number;
 	background: TBackground;
+	timeRemapConfig?: TimeRemapConfig;
 };
 
 export function buildScene(params: BuildSceneParams) {
-	const { tracks, mediaAssets, duration, canvasSize, background } = params;
+	const { tracks, mediaAssets, duration, canvasSize, background, timeRemapConfig } = params;
 
 	const rootNode = new RootNode({ duration });
 	const mediaMap = new Map(mediaAssets.map((m) => [m.id, m]));
@@ -40,6 +43,12 @@ export function buildScene(params: BuildSceneParams) {
 	const contentNodes = [];
 
 	for (const track of orderedTracksBottomToTop) {
+		// Get track behavior for time remapping
+		const trackBehavior = timeRemapConfig
+			? getTrackBehavior(track.id, timeRemapConfig)
+			: "stretch";
+		const timeScale = timeRemapConfig?.timeScale ?? 1;
+
 		const elements = track.elements
 			.filter((element) => !("hidden" in element && element.hidden))
 			.slice()
@@ -49,6 +58,14 @@ export function buildScene(params: BuildSceneParams) {
 			});
 
 		for (const element of elements) {
+			// Calculate remapped timing based on track behavior
+			const elementStartTime = timeRemapConfig
+				? remapTime(element.startTime, timeScale)
+				: element.startTime;
+			const elementDuration = trackBehavior === "stretch" && timeRemapConfig
+				? remapTime(element.duration, timeScale)
+				: element.duration;
+
 			if (element.type === "video" || element.type === "image") {
 				const mediaAsset = mediaMap.get(element.mediaId);
 				if (!mediaAsset?.file) {
@@ -60,8 +77,8 @@ export function buildScene(params: BuildSceneParams) {
 						new VideoNode({
 							mediaId: mediaAsset.id,
 							file: mediaAsset.file,
-							duration: element.duration,
-							timeOffset: element.startTime,
+							duration: elementDuration,
+							timeOffset: elementStartTime,
 							trimStart: element.trimStart,
 							trimEnd: element.trimEnd,
 						}),
@@ -71,8 +88,8 @@ export function buildScene(params: BuildSceneParams) {
 					contentNodes.push(
 						new ImageNode({
 							file: mediaAsset.file,
-							duration: element.duration,
-							timeOffset: element.startTime,
+							duration: elementDuration,
+							timeOffset: elementStartTime,
 							trimStart: element.trimStart,
 							trimEnd: element.trimEnd,
 						}),
@@ -84,6 +101,8 @@ export function buildScene(params: BuildSceneParams) {
 				contentNodes.push(
 					new TextNode({
 						...element,
+						startTime: elementStartTime,
+						duration: elementDuration,
 						canvasCenter: { x: canvasSize.width / 2, y: canvasSize.height / 2 },
 						textBaseline: "middle",
 					}),
@@ -94,8 +113,8 @@ export function buildScene(params: BuildSceneParams) {
 				contentNodes.push(
 					new StickerNode({
 						iconName: element.iconName,
-						duration: element.duration,
-						timeOffset: element.startTime,
+						duration: elementDuration,
+						timeOffset: elementStartTime,
 						trimStart: element.trimStart,
 						trimEnd: element.trimEnd,
 						transform: element.transform,

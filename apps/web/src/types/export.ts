@@ -1,3 +1,5 @@
+import type { TimeRemapConfig } from "./time-remap";
+
 export const EXPORT_QUALITY_VALUES = [
 	"low",
 	"medium",
@@ -15,6 +17,7 @@ export interface ExportOptions {
 	quality: ExportQuality;
 	fps?: number;
 	includeAudio?: boolean;
+	timeRemapConfig?: TimeRemapConfig;
 	onProgress?: ({ progress }: { progress: number }) => void;
 	onCancel?: () => boolean;
 }

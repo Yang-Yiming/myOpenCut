@@ -266,7 +266,7 @@ export class TimelineManager {
 	}
 
 	getTracks(): TimelineTrack[] {
-		return this.editor.scenes.getActiveScene()?.tracks ?? [];
+		return this.editor.scenes.getActiveSceneOrNull()?.tracks ?? [];
 	}
 
 	subscribe(listener: () => void): () => void {

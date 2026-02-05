@@ -4,6 +4,8 @@ import type { ExportOptions, ExportResult } from "@/types/export";
 import { SceneExporter } from "@/services/renderer/scene-exporter";
 import { buildScene } from "@/services/renderer/scene-builder";
 import { createTimelineAudioBuffer } from "@/lib/media/audio";
+import { createTimelineAudioBufferWithRemap } from "@/lib/media/audio-remap";
+import { getRemappedDuration } from "@/lib/time-remap";
 
 export class RendererManager {
 	private renderTree: RootNode | null = null;
@@ -25,7 +27,7 @@ export class RendererManager {
 	}: {
 		options: ExportOptions;
 	}): Promise<ExportResult> {
-		const { format, quality, fps, includeAudio, onProgress, onCancel } =
+		const { format, quality, fps, includeAudio, timeRemapConfig, onProgress, onCancel } =
 			options;
 
 		try {
@@ -37,10 +39,15 @@ export class RendererManager {
 				return { success: false, error: "No active project" };
 			}
 
-			const duration = this.editor.timeline.getTotalDuration();
-			if (duration === 0) {
+			const originalDuration = this.editor.timeline.getTotalDuration();
+			if (originalDuration === 0) {
 				return { success: false, error: "Project is empty" };
 			}
+
+			// Calculate final duration based on time remap config
+			const duration = timeRemapConfig
+				? getRemappedDuration(originalDuration, timeRemapConfig.timeScale)
+				: originalDuration;
 
 			const exportFps = fps || activeProject.settings.fps;
 			const canvasSize = activeProject.settings.canvasSize;
@@ -48,11 +55,20 @@ export class RendererManager {
 			let audioBuffer: AudioBuffer | null = null;
 			if (includeAudio) {
 				onProgress?.({ progress: 0.05 });
-				audioBuffer = await createTimelineAudioBuffer({
-					tracks,
-					mediaAssets,
-					duration,
-				});
+				if (timeRemapConfig) {
+					audioBuffer = await createTimelineAudioBufferWithRemap({
+						tracks,
+						mediaAssets,
+						originalDuration,
+						timeRemapConfig,
+					});
+				} else {
+					audioBuffer = await createTimelineAudioBuffer({
+						tracks,
+						mediaAssets,
+						duration,
+					});
+				}
 			}
 
 			const scene = buildScene({
@@ -61,6 +77,7 @@ export class RendererManager {
 				duration,
 				canvasSize,
 				background: activeProject.settings.background,
+				timeRemapConfig,
 			});
 
 			const exporter = new SceneExporter({
