@@ -28,8 +28,13 @@ export function OneshotWaveformEditor({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [dragging, setDragging] = useState<"trimStart" | "trimEnd" | "cuePoint" | null>(null);
+	const [playheadTime, setPlayheadTime] = useState<number | null>(null);
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+	const playbackStartTimeRef = useRef<number | null>(null);
+	const playheadStartOffsetRef = useRef<number>(0);
+	const rafIdRef = useRef<number | null>(null);
+	const isStoppingRef = useRef(false);
 
 	const duration = audioBuffer.duration;
 
@@ -108,7 +113,41 @@ export function OneshotWaveformEditor({
 		ctx.closePath();
 		ctx.fill();
 
-	}, [audioBuffer, trimStart, trimEnd, cuePoint, duration]);
+		// Draw playhead while previewing
+		if (playheadTime !== null) {
+			const playheadX = (playheadTime / duration) * width;
+			ctx.fillStyle = "#e5e7eb";
+			ctx.fillRect(playheadX - 1, 0, 2, height);
+		}
+
+	}, [audioBuffer, trimStart, trimEnd, cuePoint, duration, playheadTime]);
+
+	useEffect(() => {
+		if (!isPlaying) return undefined;
+		const ctx = audioContextRef.current;
+		if (!ctx) return undefined;
+
+		const tick = () => {
+			const playbackStartTime = playbackStartTimeRef.current ?? ctx.currentTime;
+			const elapsed = ctx.currentTime - playbackStartTime;
+			const nextTime = playheadStartOffsetRef.current + elapsed;
+			if (nextTime >= trimEnd) {
+				setPlayheadTime(trimEnd);
+				return;
+			}
+			setPlayheadTime(nextTime);
+			rafIdRef.current = window.requestAnimationFrame(tick);
+		};
+
+		rafIdRef.current = window.requestAnimationFrame(tick);
+
+		return () => {
+			if (rafIdRef.current !== null) {
+				window.cancelAnimationFrame(rafIdRef.current);
+				rafIdRef.current = null;
+			}
+		};
+	}, [isPlaying, trimEnd]);
 
 	// Handle mouse events for dragging
 	const getTimeFromX = useCallback((clientX: number) => {
@@ -130,7 +169,11 @@ export function OneshotWaveformEditor({
 
 		const minDist = Math.min(distToTrimStart, distToTrimEnd, distToCue);
 
-		if (minDist > threshold) return;
+		if (minDist > threshold) {
+			const nextPlayhead = Math.max(trimStart, Math.min(trimEnd, time));
+			setPlayheadTime(nextPlayhead);
+			return;
+		}
 
 		if (minDist === distToTrimStart) {
 			setDragging("trimStart");
@@ -163,8 +206,25 @@ export function OneshotWaveformEditor({
 	// Preview playback
 	const handlePlayPreview = useCallback(() => {
 		if (isPlaying) {
+			const ctx = audioContextRef.current;
+			if (ctx && playbackStartTimeRef.current !== null) {
+				const elapsed = ctx.currentTime - playbackStartTimeRef.current;
+				const nextTime = playheadStartOffsetRef.current + elapsed;
+				const clampedTime = Math.max(trimStart, Math.min(trimEnd, nextTime));
+				setPlayheadTime(clampedTime);
+				playheadStartOffsetRef.current = clampedTime;
+			} else if (playheadTime === null) {
+				setPlayheadTime(trimStart);
+				playheadStartOffsetRef.current = trimStart;
+			}
+			isStoppingRef.current = true;
 			sourceNodeRef.current?.stop();
+			sourceNodeRef.current = null;
 			setIsPlaying(false);
+			if (rafIdRef.current !== null) {
+				window.cancelAnimationFrame(rafIdRef.current);
+				rafIdRef.current = null;
+			}
 			return;
 		}
 
@@ -173,25 +233,40 @@ export function OneshotWaveformEditor({
 		}
 
 		const ctx = audioContextRef.current;
+		void ctx.resume();
 		const source = ctx.createBufferSource();
 		source.buffer = audioBuffer;
 		source.connect(ctx.destination);
 
-		const sliceDuration = trimEnd - trimStart;
-		source.start(0, trimStart, sliceDuration);
+		const startAt = Math.max(trimStart, Math.min(trimEnd, playheadTime ?? trimStart));
+		const sliceDuration = Math.max(0, trimEnd - startAt);
+		playbackStartTimeRef.current = ctx.currentTime;
+		playheadStartOffsetRef.current = startAt;
+		setPlayheadTime(startAt);
+		source.start(0, startAt, sliceDuration);
 
 		source.onended = () => {
 			setIsPlaying(false);
+			if (isStoppingRef.current) {
+				isStoppingRef.current = false;
+				return;
+			}
+			setPlayheadTime(trimEnd);
+			playheadStartOffsetRef.current = trimEnd;
 		};
 
 		sourceNodeRef.current = source;
 		setIsPlaying(true);
-	}, [isPlaying, audioBuffer, trimStart, trimEnd]);
+	}, [isPlaying, audioBuffer, trimStart, trimEnd, playheadTime]);
 
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
 			sourceNodeRef.current?.stop();
+			if (rafIdRef.current !== null) {
+				window.cancelAnimationFrame(rafIdRef.current);
+				rafIdRef.current = null;
+			}
 		};
 	}, []);
 
