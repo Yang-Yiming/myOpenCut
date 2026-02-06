@@ -35,6 +35,7 @@ export function OneshotWaveformEditor({
 	const playheadStartOffsetRef = useRef<number>(0);
 	const rafIdRef = useRef<number | null>(null);
 	const isStoppingRef = useRef(false);
+	const playbackEndTimeRef = useRef<number>(0);
 
 	const duration = audioBuffer.duration;
 
@@ -131,8 +132,8 @@ export function OneshotWaveformEditor({
 			const playbackStartTime = playbackStartTimeRef.current ?? ctx.currentTime;
 			const elapsed = ctx.currentTime - playbackStartTime;
 			const nextTime = playheadStartOffsetRef.current + elapsed;
-			if (nextTime >= trimEnd) {
-				setPlayheadTime(trimEnd);
+			if (nextTime >= playbackEndTimeRef.current) {
+				setPlayheadTime(playbackEndTimeRef.current);
 				return;
 			}
 			setPlayheadTime(nextTime);
@@ -147,7 +148,7 @@ export function OneshotWaveformEditor({
 				rafIdRef.current = null;
 			}
 		};
-	}, [isPlaying, trimEnd]);
+	}, [isPlaying]);
 
 	// Handle mouse events for dragging
 	const getTimeFromX = useCallback((clientX: number) => {
@@ -170,8 +171,9 @@ export function OneshotWaveformEditor({
 		const minDist = Math.min(distToTrimStart, distToTrimEnd, distToCue);
 
 		if (minDist > threshold) {
-			const nextPlayhead = Math.max(trimStart, Math.min(trimEnd, time));
+			const nextPlayhead = Math.max(0, Math.min(duration, time));
 			setPlayheadTime(nextPlayhead);
+			playheadStartOffsetRef.current = nextPlayhead;
 			return;
 		}
 
@@ -238,10 +240,17 @@ export function OneshotWaveformEditor({
 		source.buffer = audioBuffer;
 		source.connect(ctx.destination);
 
-		const startAt = Math.max(trimStart, Math.min(trimEnd, playheadTime ?? trimStart));
-		const sliceDuration = Math.max(0, trimEnd - startAt);
+		const rawStartAt = playheadTime ?? trimStart;
+		const startAt = Math.max(0, Math.min(duration, rawStartAt));
+		const endAt = startAt < trimStart
+			? trimEnd
+			: startAt > trimEnd
+				? duration
+				: trimEnd;
+		const sliceDuration = Math.max(0, endAt - startAt);
 		playbackStartTimeRef.current = ctx.currentTime;
 		playheadStartOffsetRef.current = startAt;
+		playbackEndTimeRef.current = endAt;
 		setPlayheadTime(startAt);
 		source.start(0, startAt, sliceDuration);
 
@@ -251,8 +260,8 @@ export function OneshotWaveformEditor({
 				isStoppingRef.current = false;
 				return;
 			}
-			setPlayheadTime(trimEnd);
-			playheadStartOffsetRef.current = trimEnd;
+			setPlayheadTime(playbackEndTimeRef.current);
+			playheadStartOffsetRef.current = playbackEndTimeRef.current;
 		};
 
 		sourceNodeRef.current = source;
@@ -269,6 +278,37 @@ export function OneshotWaveformEditor({
 			}
 		};
 	}, []);
+
+	const getPlayheadOrDefault = useCallback(() => {
+		return playheadTime ?? trimStart;
+	}, [playheadTime, trimStart]);
+
+	const handleJumpTo = useCallback((time: number) => {
+		const clamped = Math.max(0, Math.min(duration, time));
+		setPlayheadTime(clamped);
+		playheadStartOffsetRef.current = clamped;
+	}, [duration]);
+
+	const handleSetTrimStartToPlayhead = useCallback(() => {
+		const next = Math.min(getPlayheadOrDefault(), trimEnd - 0.01);
+		onTrimStartChange(next);
+		setPlayheadTime(next);
+		playheadStartOffsetRef.current = next;
+	}, [getPlayheadOrDefault, trimEnd, onTrimStartChange]);
+
+	const handleSetTrimEndToPlayhead = useCallback(() => {
+		const next = Math.max(getPlayheadOrDefault(), trimStart + 0.01);
+		onTrimEndChange(next);
+		setPlayheadTime(next);
+		playheadStartOffsetRef.current = next;
+	}, [getPlayheadOrDefault, trimStart, onTrimEndChange]);
+
+	const handleSetCueToPlayhead = useCallback(() => {
+		const next = Math.max(trimStart, Math.min(trimEnd, getPlayheadOrDefault()));
+		onCuePointChange(next);
+		setPlayheadTime(next);
+		playheadStartOffsetRef.current = next;
+	}, [getPlayheadOrDefault, trimStart, trimEnd, onCuePointChange]);
 
 	const sliceDuration = trimEnd - trimStart;
 	const cueOffset = cuePoint - trimStart;
@@ -306,17 +346,71 @@ export function OneshotWaveformEditor({
 			</div>
 
 			<div className="grid grid-cols-3 gap-2 text-xs">
-				<div className="flex flex-col items-center p-2 bg-muted/30 rounded">
+				<div className="flex flex-col items-center gap-2 p-2 bg-muted/30 rounded">
 					<span className="text-muted-foreground">Trim Start</span>
 					<span className="font-mono text-green-500">{trimStart.toFixed(3)}s</span>
+					<div className="flex gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => handleJumpTo(trimStart)}
+						>
+							Jump
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={handleSetTrimStartToPlayhead}
+						>
+							Set
+						</Button>
+					</div>
 				</div>
-				<div className="flex flex-col items-center p-2 bg-muted/30 rounded">
+				<div className="flex flex-col items-center gap-2 p-2 bg-muted/30 rounded">
 					<span className="text-muted-foreground">Cue Point</span>
 					<span className="font-mono text-orange-500">{cuePoint.toFixed(3)}s</span>
+					<div className="flex gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => handleJumpTo(cuePoint)}
+						>
+							Jump
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={handleSetCueToPlayhead}
+						>
+							Set
+						</Button>
+					</div>
 				</div>
-				<div className="flex flex-col items-center p-2 bg-muted/30 rounded">
+				<div className="flex flex-col items-center gap-2 p-2 bg-muted/30 rounded">
 					<span className="text-muted-foreground">Trim End</span>
 					<span className="font-mono text-green-500">{trimEnd.toFixed(3)}s</span>
+					<div className="flex gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => handleJumpTo(trimEnd)}
+						>
+							Jump
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={handleSetTrimEndToPlayhead}
+						>
+							Set
+						</Button>
+					</div>
 				</div>
 			</div>
 		</div>
