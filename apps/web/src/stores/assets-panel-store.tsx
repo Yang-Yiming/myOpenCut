@@ -18,6 +18,8 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 
 export const TAB_KEYS = [
 	"media",
+	"automation",
+	"settings",
 	"sounds",
 	"text",
 	"stickers",
@@ -26,8 +28,6 @@ export const TAB_KEYS = [
 	"captions",
 	"filters",
 	"adjustment",
-	"automation",
-	"settings",
 ] as const;
 
 export type Tab = (typeof TAB_KEYS)[number];

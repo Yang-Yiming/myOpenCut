@@ -34,9 +34,9 @@ export function AutomationView() {
 	const { startCreatingState } = useAutomationStore();
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full min-h-0 flex-col">
 			{/* Tabs */}
-			<Tabs defaultValue="state" className="flex h-full flex-col">
+			<Tabs defaultValue="state" className="flex h-full min-h-0 flex-col">
 				<div className="px-3 pt-4 pb-2">
 					<TabsList className="w-full">
 						<TabsTrigger value="state" className="flex-1">
@@ -51,7 +51,7 @@ export function AutomationView() {
 				<Separator className="my-2" />
 
 				{/* State Tab Content */}
-				<TabsContent value="state" className="flex-1 flex flex-col mt-0">
+				<TabsContent value="state" className="flex-1 min-h-0 flex flex-col mt-0">
 					{/* Header with Create button */}
 					<div className="px-3 pb-2">
 						<Button onClick={startCreatingState} className="w-full">
@@ -63,13 +63,13 @@ export function AutomationView() {
 					<Separator className="my-4" />
 
 					{/* States list */}
-					<ScrollArea className="flex-1 px-5">
+					<ScrollArea className="flex-1 min-h-0 px-5">
 						<AutomationStatesList />
 					</ScrollArea>
 				</TabsContent>
 
 				{/* Oneshot Tab Content */}
-				<TabsContent value="oneshot" className="flex-1 flex flex-col mt-0">
+				<TabsContent value="oneshot" className="flex-1 min-h-0 flex flex-col mt-0">
 					<OneshotView />
 				</TabsContent>
 			</Tabs>

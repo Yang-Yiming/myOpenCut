@@ -22,7 +22,7 @@ export function OneshotView() {
 	const { startCreatingOneshot } = useOneshotStore();
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full min-h-0 flex-col">
 			{/* Header with Create button */}
 			<div className="px-3 pb-2">
 				<Button onClick={startCreatingOneshot} className="w-full">
@@ -32,7 +32,7 @@ export function OneshotView() {
 			</div>
 
 			{/* Oneshots list */}
-			<ScrollArea className="flex-1 px-5">
+			<ScrollArea className="flex-1 min-h-0 px-5">
 				<OneshotsList />
 			</ScrollArea>
 
