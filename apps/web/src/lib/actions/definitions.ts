@@ -142,6 +142,11 @@ export const ACTIONS = {
 		category: "timeline",
 		defaultShortcuts: ["o"],
 	},
+	"cycle-oneshot": {
+		description: "Cycle to next oneshot in mark mode",
+		category: "timeline",
+		defaultShortcuts: ["shift+tab"],
+	},
 	undo: {
 		description: "Undo",
 		category: "history",

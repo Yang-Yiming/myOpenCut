@@ -4,7 +4,6 @@ import { useEditor } from "@/hooks/use-editor";
 import { useState, useEffect } from "react";
 import { DeleteOneshotMarkerCommand } from "@/lib/commands";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
-
 export function OneshotTimelineMarkers({
 	zoomLevel,
 }: {

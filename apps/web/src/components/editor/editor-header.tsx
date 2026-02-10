@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "../ui/button";
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -28,6 +28,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "./dialogs/shortcuts-dialog";
+import { useOneshotStore } from "@/stores/oneshot-store";
 
 export function EditorHeader() {
 	return (
@@ -35,11 +36,49 @@ export function EditorHeader() {
 			<div className="flex items-center gap-2">
 				<ProjectDropdown />
 			</div>
+			<div className="flex items-center gap-2">
+				<MarkModeIndicator />
+			</div>
 			<nav className="flex items-center gap-2">
 				<ExportButton />
 				<ThemeToggle />
 			</nav>
 		</header>
+	);
+}
+
+function MarkModeIndicator() {
+	const editor = useEditor();
+	const { isMarkModeActive, activeOneshotId, exitMarkMode } = useOneshotStore();
+	const [, forceUpdate] = useState({});
+
+	useEffect(() => {
+		const unsubscribe = editor.oneshot.subscribe(() => {
+			forceUpdate({});
+		});
+		return unsubscribe;
+	}, [editor.oneshot]);
+
+	if (!isMarkModeActive || !activeOneshotId) return null;
+
+	const definition = editor.oneshot.getDefinition(activeOneshotId);
+	if (!definition) return null;
+
+	return (
+		<div className="flex items-center gap-2 rounded-md border px-3 py-1 text-sm">
+			<div
+				className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+				style={{ backgroundColor: definition.color }}
+			/>
+			<span className="font-medium">Mark Mode: {definition.name}</span>
+			<button
+				type="button"
+				onClick={exitMarkMode}
+				className="text-muted-foreground hover:text-foreground ml-1"
+			>
+				<X className="h-3.5 w-3.5" />
+			</button>
+		</div>
 	);
 }
 

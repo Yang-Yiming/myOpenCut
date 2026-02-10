@@ -14,9 +14,10 @@ import { useEditor } from "@/hooks/use-editor";
 import { useOneshotStore } from "@/stores/oneshot-store";
 import type { OneshotDefinition } from "@/types/oneshot";
 import { DeleteOneshotCommand, DeleteOneshotMarkerCommand } from "@/lib/commands";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { OneshotDefinitionDialog } from "@/components/editor/dialogs/oneshot-definition-dialog";
 import { OneshotSelectionDialog } from "@/components/editor/dialogs/oneshot-selection-dialog";
+import { TargetIcon } from "@hugeicons/core-free-icons";
 
 export function OneshotView() {
 	const { startCreatingOneshot } = useOneshotStore();
@@ -24,11 +25,14 @@ export function OneshotView() {
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			{/* Header with Create button */}
-			<div className="px-3 pb-2">
+			<div className="px-3 pb-2 flex flex-col gap-2">
 				<Button onClick={startCreatingOneshot} className="w-full">
 					<HugeiconsIcon icon={PlusSignIcon} />
 					Create Oneshot
 				</Button>
+				<div className="flex gap-2">
+					<GlobalMarkModeButton />
+				</div>
 			</div>
 
 			{/* Oneshots list */}
@@ -42,6 +46,42 @@ export function OneshotView() {
 			{/* Dialog for selecting oneshot when pressing O without mark mode */}
 			<OneshotSelectionDialog />
 		</div>
+	);
+}
+
+function GlobalMarkModeButton() {
+	const editor = useEditor();
+	const { isMarkModeActive, enterMarkMode, exitMarkMode } = useOneshotStore();
+	const [, forceUpdate] = useState({});
+
+	useEffect(() => {
+		const unsubscribe = editor.oneshot.subscribe(() => {
+			forceUpdate({});
+		});
+		return unsubscribe;
+	}, [editor.oneshot]);
+
+	const definitions = editor.oneshot.getDefinitions();
+	const hasDefinitions = definitions.length > 0;
+
+	const handleClick = useCallback(() => {
+		if (isMarkModeActive) {
+			exitMarkMode();
+		} else if (hasDefinitions) {
+			enterMarkMode(definitions[0].id);
+		}
+	}, [isMarkModeActive, hasDefinitions, definitions, enterMarkMode, exitMarkMode]);
+
+	return (
+		<Button
+			variant={isMarkModeActive ? "default" : "outline"}
+			onClick={handleClick}
+			disabled={!hasDefinitions && !isMarkModeActive}
+			className="flex-[3]"
+		>
+			<HugeiconsIcon icon={TargetIcon} />
+			{isMarkModeActive ? "Exit Mark Mode" : "Enter Mark Mode"}
+		</Button>
 	);
 }
 

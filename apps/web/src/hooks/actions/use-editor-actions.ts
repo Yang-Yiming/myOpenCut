@@ -325,8 +325,28 @@ export function useEditorActions() {
 				}),
 			);
 
-			// Exit mark mode after marking
-			exitMarkMode();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"cycle-oneshot",
+		() => {
+			const { isMarkModeActive, activeOneshotId, enterMarkMode } =
+				useOneshotStore.getState();
+
+			const definitions = editor.oneshot.getDefinitions();
+			if (definitions.length === 0) return;
+
+			if (!isMarkModeActive || !activeOneshotId) {
+				// Not in mark mode — enter with first oneshot
+				enterMarkMode(definitions[0].id);
+				return;
+			}
+
+			const currentIndex = definitions.findIndex((d) => d.id === activeOneshotId);
+			const nextIndex = (currentIndex + 1) % definitions.length;
+			enterMarkMode(definitions[nextIndex].id);
 		},
 		undefined,
 	);
