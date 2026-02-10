@@ -1,6 +1,7 @@
 // Track time behavior for time remapping export
-export type TrackTimeBehavior = "stretch" | "loop" | "fixed";
-// stretch: Follow time scaling (video becomes slower/faster)
+export type TrackTimeBehavior = "stretch" | "pitch-preserve" | "loop" | "fixed";
+// stretch: Follow time scaling (speed + pitch change together)
+// pitch-preserve: Follow time scaling (speed changes, pitch preserved)
 // loop: Keep original speed, loop to fill new duration
 // fixed: Keep original speed, play once (no loop)
 
@@ -98,6 +99,24 @@ export const TIME_REMAP_PRESETS: TimeRemapPreset[] = [
 			oneshotMarkerConfig: {
 				triggerBehavior: "stretch",
 				playbackBehavior: "stretch",
+			},
+		},
+	},
+	{
+		id: "slow-motion-pitch-preserve",
+		name: "Slow Motion (Pitch Preserve)",
+		description: "Video at 0.5x speed, audio pitch preserved",
+		config: {
+			timeScale: 0.5,
+			defaultVideoBehavior: "stretch",
+			defaultAudioBehavior: "pitch-preserve",
+			automationMarkerConfig: {
+				triggerBehavior: "stretch",
+				playbackBehavior: "original",
+			},
+			oneshotMarkerConfig: {
+				triggerBehavior: "stretch",
+				playbackBehavior: "original",
 			},
 		},
 	},

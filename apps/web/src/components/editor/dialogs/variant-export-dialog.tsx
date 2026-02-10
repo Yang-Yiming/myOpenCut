@@ -53,6 +53,7 @@ const TIME_SCALE_OPTIONS = [
 
 const TRACK_BEHAVIOR_OPTIONS: { value: TrackTimeBehavior; label: string }[] = [
 	{ value: "stretch", label: "Stretch" },
+	{ value: "pitch-preserve", label: "Pitch Preserve" },
 	{ value: "loop", label: "Loop" },
 	{ value: "fixed", label: "Fixed" },
 ];
@@ -304,7 +305,7 @@ export function VariantExportDialog({
 												handleTrackBehaviorChange(track.id, v as TrackTimeBehavior)
 											}
 										>
-											<SelectTrigger className="w-24">
+											<SelectTrigger className="w-32">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>

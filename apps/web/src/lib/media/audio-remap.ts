@@ -12,6 +12,7 @@ import {
 	remapTime,
 	getRemappedDuration,
 } from "@/lib/time-remap";
+import { SoundTouch, SimpleFilter } from "soundtouchjs";
 
 export interface RemappedAudioElement extends CollectedAudioElement {
 	behavior: TrackTimeBehavior;
@@ -65,7 +66,10 @@ export async function collectAudioElementsWithRemap({
 			? getTrackBehavior(trackId, timeRemapConfig)
 			: "stretch";
 
-		const playbackRate = behavior === "stretch" ? timeRemapConfig.timeScale : 1.0;
+		const playbackRate =
+			behavior === "stretch" || behavior === "pitch-preserve"
+				? timeRemapConfig.timeScale
+				: 1.0;
 
 		return {
 			...element,
@@ -147,6 +151,9 @@ function mixRemappedAudioElement({
 		case "stretch":
 			mixAudioStretched({ element, outputBuffer, outputLength, sampleRate });
 			break;
+		case "pitch-preserve":
+			mixAudioPitchPreserve({ element, outputBuffer, outputLength, sampleRate });
+			break;
 		case "loop":
 			mixAudioLooping({ element, outputBuffer, outputLength, sampleRate, newDuration });
 			break;
@@ -197,6 +204,89 @@ function mixAudioStretched({
 
 			outputData[outputIndex] += sourceData[sourceIndex];
 		}
+	}
+}
+
+/**
+ * Mix audio with pitch-preserve behavior - duration changes but pitch stays the same.
+ * Uses SoundTouch WSOLA algorithm via soundtouchjs.
+ */
+function mixAudioPitchPreserve({
+	element,
+	outputBuffer,
+	outputLength,
+	sampleRate,
+}: {
+	element: RemappedAudioElement;
+	outputBuffer: AudioBuffer;
+	outputLength: number;
+	sampleRate: number;
+}): void {
+	const { buffer, startTime, trimStart, duration: elementDuration, playbackRate } = element;
+
+	const sourceStartSample = Math.floor(trimStart * buffer.sampleRate);
+	const sourceSamples = Math.floor(elementDuration * playbackRate * buffer.sampleRate);
+	const sourceEnd = Math.min(sourceStartSample + sourceSamples, buffer.getChannelData(0).length);
+	const actualSourceSamples = sourceEnd - sourceStartSample;
+
+	if (actualSourceSamples <= 0) return;
+
+	// Build interleaved stereo buffer from source
+	const interleaved = new Float32Array(actualSourceSamples * 2);
+	const srcCh0 = buffer.getChannelData(0);
+	const srcCh1 = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : srcCh0;
+
+	for (let i = 0; i < actualSourceSamples; i++) {
+		const si = sourceStartSample + i;
+		interleaved[i * 2] = srcCh0[si];
+		interleaved[i * 2 + 1] = srcCh1[si];
+	}
+
+	// Set up SoundTouch processing
+	const st = new SoundTouch();
+	st.tempo = playbackRate;
+
+	let sourcePosition = 0;
+	const sourceFrameCount = actualSourceSamples;
+
+	const source = {
+		extract(target: Float32Array, numFrames: number, position: number): number {
+			const framesToRead = Math.min(numFrames, sourceFrameCount - sourcePosition);
+			if (framesToRead <= 0) return 0;
+
+			for (let i = 0; i < framesToRead * 2; i++) {
+				target[i] = interleaved[sourcePosition * 2 + i];
+			}
+			sourcePosition += framesToRead;
+			return framesToRead;
+		},
+	};
+
+	const filter = new SimpleFilter(source, st);
+
+	// Extract processed samples
+	const outputStartSample = Math.floor(startTime * sampleRate);
+	const expectedOutputFrames = Math.floor(elementDuration * sampleRate);
+	const chunkSize = 4096;
+	const chunkBuffer = new Float32Array(chunkSize * 2);
+
+	const outCh0 = outputBuffer.getChannelData(0);
+	const outCh1 = outputBuffer.getChannelData(1);
+
+	let framesWritten = 0;
+	while (framesWritten < expectedOutputFrames) {
+		const framesToExtract = Math.min(chunkSize, expectedOutputFrames - framesWritten);
+		const extracted = filter.extract(chunkBuffer, framesToExtract);
+		if (extracted === 0) break;
+
+		for (let i = 0; i < extracted; i++) {
+			const outIdx = outputStartSample + framesWritten + i;
+			if (outIdx >= outputLength) break;
+
+			outCh0[outIdx] += chunkBuffer[i * 2];
+			outCh1[outIdx] += chunkBuffer[i * 2 + 1];
+		}
+		framesWritten += extracted;
 	}
 }
 
