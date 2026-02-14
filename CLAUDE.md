@@ -215,7 +215,7 @@ TypeScript errors silently prevent changes from taking effect in the dev server 
 ```bash
 npx tsc --noEmit -p apps/web/tsconfig.json 2>&1 | head -40
 ```
-Note: `oneshot-manager.ts:261` has a pre-existing `string | undefined` vs `string | null` error — ignore it.
+Note: `oneshot-manager.ts` has a pre-existing `string | undefined` vs `string | null` error in `resolveAudioUrl` — ignore it.
 
 ### Discriminated Union Narrowing Through Property Chains
 TypeScript does NOT narrow discriminated unions through property access chains. This is a common trap with types like `SidechainSource`:
@@ -248,4 +248,16 @@ When mapping results from `collectAudioElements()` into typed arrays that expect
 - **Persistence**: `sidechainConfigs` lives on `TScene` (per-scene). The storage service has migration logic to convert old `sourceTrackId: string` format to the new `source: SidechainSource` union.
 - **Cache invalidation**: `SidechainManager` subscribes to `editor.scenes` changes to auto-clear envelope cache on scene switch. The `updateConfig` method invalidates on `updates.source` (not the old `updates.sourceTrackId`).
 - **Playback**: `AudioManager.oneshotGainNodes` tracks active oneshot gain nodes for real-time sidechain ducking. Cleaned up in `stopPlayback()`.
+
+### Playback Cache Lifecycle
+Several managers use a `prepareForPlayback()` / `clearPlaybackCache()` pattern to snapshot data at playback start and avoid per-tick scene reads. `AudioManager.startPlayback()` calls all `prepareForPlayback()` methods; `stopPlayback()` calls all `clearPlaybackCache()` methods. When adding new per-tick lookups, follow this pattern:
+- **SidechainManager**: Builds `Map<targetId, SidechainEnvelope[]>` lookup tables so `getSidechainGainForTrack/ForOneshot` does `Map.get()` instead of filtering configs each tick.
+- **AutomationManager**: Snapshots markers, states, and elementTimeRanges so `getEffectiveVolumeForTrack` skips per-tick track/element traversal.
+- **OneshotManager**: Builds a sorted marker index (by `audioStartTime`) so `getMarkersInTimeWindow` uses binary search instead of O(markers × definitions).
+
+### Unified Clock Source
+`PlaybackManager` supports an external clock source via `setClockSource()` / `clearClockSource()`. During audio playback, `AudioManager` sets the clock source to `AudioContext.currentTime`-derived time, so the visual timeline and audio share the same clock. If the audio clock stalls for >200ms, `PlaybackManager` automatically falls back to `performance.now()` delta accumulation.
+
+### AudioContext Reuse for Decoding
+`OneshotManager` and `SidechainManager` each reuse a single `AudioContext` (via `getDecodeContext()`) for `decodeAudioData` calls. Do NOT create `new AudioContext()` per decode — browsers limit to 6-8 contexts and excess ones silently fail.
 

@@ -11,8 +11,24 @@ import { nanoid } from "nanoid";
 export class OneshotManager {
 	private listeners = new Set<() => void>();
 	private audioBufferCache = new Map<string, AudioBuffer>();
+	private decodeContext: AudioContext | null = null;
+
+	// Playback cache: sorted marker index for binary search scheduling
+	private sortedMarkerIndex: Array<{
+		marker: OneshotMarker;
+		definition: OneshotDefinition;
+		audioStartTime: number;
+		audioEndTime: number;
+	}> | null = null;
 
 	constructor(private editor: EditorCore) {}
+
+	private getDecodeContext(): AudioContext {
+		if (!this.decodeContext) {
+			this.decodeContext = new AudioContext();
+		}
+		return this.decodeContext;
+	}
 
 	// ---- Definition CRUD ----
 
@@ -194,6 +210,12 @@ export class OneshotManager {
 		startTime: number,
 		endTime: number,
 	): Array<{ marker: OneshotMarker; definition: OneshotDefinition; audioStartTime: number }> {
+		// Fast path: use sorted index with binary search during playback
+		if (this.sortedMarkerIndex) {
+			return this.getMarkersInTimeWindowFast(startTime, endTime);
+		}
+
+		// Slow path fallback: read from scene each time
 		const markers = this.getMarkers();
 		const results: Array<{
 			marker: OneshotMarker;
@@ -213,6 +235,109 @@ export class OneshotManager {
 
 			if (audioStartTime < endTime && audioEndTime > startTime) {
 				results.push({ marker, definition, audioStartTime });
+			}
+		}
+
+		return results;
+	}
+
+	// ---- Playback cache ----
+
+	/**
+	 * Build a sorted marker index for O(log n) scheduling during playback.
+	 * Pre-resolves all definitions and computes audio time ranges once.
+	 */
+	prepareForPlayback(): void {
+		const markers = this.getMarkers();
+		const definitions = this.getDefinitions();
+
+		// Build definition lookup map to avoid O(n) .find() per marker
+		const defMap = new Map<string, OneshotDefinition>();
+		for (const def of definitions) {
+			defMap.set(def.id, def);
+		}
+
+		const index: Array<{
+			marker: OneshotMarker;
+			definition: OneshotDefinition;
+			audioStartTime: number;
+			audioEndTime: number;
+		}> = [];
+
+		for (const marker of markers) {
+			const definition = defMap.get(marker.oneshotId);
+			if (!definition) continue;
+
+			const cueOffset = definition.cuePoint - definition.trimStart;
+			const audioStartTime = marker.time - cueOffset;
+			const sliceDuration = definition.trimEnd - definition.trimStart;
+
+			index.push({
+				marker,
+				definition,
+				audioStartTime,
+				audioEndTime: audioStartTime + sliceDuration,
+			});
+		}
+
+		// Sort by audioStartTime for binary search
+		index.sort((a, b) => a.audioStartTime - b.audioStartTime);
+
+		this.sortedMarkerIndex = index;
+	}
+
+	clearPlaybackCache(): void {
+		this.sortedMarkerIndex = null;
+	}
+
+	/**
+	 * Binary search + linear scan for markers overlapping [startTime, endTime].
+	 * O(log n + window_size) instead of O(n * definitions).
+	 */
+	private getMarkersInTimeWindowFast(
+		startTime: number,
+		endTime: number,
+	): Array<{ marker: OneshotMarker; definition: OneshotDefinition; audioStartTime: number }> {
+		const index = this.sortedMarkerIndex!;
+		const results: Array<{
+			marker: OneshotMarker;
+			definition: OneshotDefinition;
+			audioStartTime: number;
+		}> = [];
+
+		if (index.length === 0) return results;
+
+		// Binary search: find first entry where audioStartTime < endTime
+		// We need entries where audioStartTime < endTime AND audioEndTime > startTime
+		let lo = 0;
+		let hi = index.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >>> 1;
+			if (index[mid].audioStartTime < startTime) {
+				lo = mid + 1;
+			} else {
+				hi = mid;
+			}
+		}
+
+		// Scan backwards to catch entries that started before startTime but haven't ended
+		let scanStart = lo;
+		while (scanStart > 0 && index[scanStart - 1].audioEndTime > startTime) {
+			scanStart--;
+		}
+
+		// Scan forward from scanStart, collecting all overlapping entries
+		for (let i = scanStart; i < index.length; i++) {
+			const entry = index[i];
+			// Past the window — no more matches possible
+			if (entry.audioStartTime >= endTime) break;
+
+			if (entry.audioEndTime > startTime) {
+				results.push({
+					marker: entry.marker,
+					definition: entry.definition,
+					audioStartTime: entry.audioStartTime,
+				});
 			}
 		}
 
@@ -239,8 +364,9 @@ export class OneshotManager {
 
 			const response = await fetch(audioUrl);
 			const arrayBuffer = await response.arrayBuffer();
-			const audioContext = new AudioContext();
-			const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+			// decodeAudioData detaches the ArrayBuffer, so slice to avoid issues with shared buffers
+			const audioContext = this.getDecodeContext();
+			const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
 			this.audioBufferCache.set(definitionId, audioBuffer);
 			return audioBuffer;

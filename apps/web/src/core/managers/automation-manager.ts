@@ -12,6 +12,13 @@ import { getEffectiveVolume, type ElementTimeRange } from "@/lib/automation/appl
 export class AutomationManager {
 	private listeners = new Set<() => void>();
 
+	// Playback cache: snapshot of markers/states/elementTimeRanges at playback start
+	private playbackCache: {
+		markers: AutomationMarker[];
+		states: AutomationState[];
+		elementTimeRanges: ElementTimeRange[];
+	} | null = null;
+
 	constructor(private editor: EditorCore) {}
 
 	// ---- State CRUD ----
@@ -238,6 +245,36 @@ export class AutomationManager {
 		return activeMarkers;
 	}
 
+	// ---- Playback cache ----
+
+	/**
+	 * Snapshot markers, states, and element time ranges for the duration of playback.
+	 * Eliminates per-tick scene reads and track/element traversals.
+	 */
+	prepareForPlayback(): void {
+		const markers = this.getMarkers();
+		const states = this.getStates();
+
+		const elementTimeRanges: ElementTimeRange[] = [];
+		const tracks = this.editor.timeline.getTracks();
+		for (const track of tracks) {
+			for (const element of track.elements) {
+				elementTimeRanges.push({
+					trackId: track.id,
+					elementId: element.id,
+					startTime: element.startTime,
+					endTime: element.startTime + element.duration,
+				});
+			}
+		}
+
+		this.playbackCache = { markers, states, elementTimeRanges };
+	}
+
+	clearPlaybackCache(): void {
+		this.playbackCache = null;
+	}
+
 	// ---- Effect application ----
 
 	getEffectiveVolumeForTrack(
@@ -246,10 +283,23 @@ export class AutomationManager {
 		time: number,
 		baseVolume: number,
 	): number {
+		// Fast path: use cached data during playback
+		if (this.playbackCache) {
+			return getEffectiveVolume(
+				trackId,
+				elementId,
+				time,
+				baseVolume,
+				this.playbackCache.markers,
+				this.playbackCache.states,
+				this.playbackCache.elementTimeRanges,
+			);
+		}
+
+		// Slow path fallback: read from scene each time
 		const markers = this.getMarkers();
 		const states = this.getStates();
 
-		// Collect element time ranges for range marker resolution
 		const elementTimeRanges: ElementTimeRange[] = [];
 		const tracks = this.editor.timeline.getTracks();
 		for (const track of tracks) {

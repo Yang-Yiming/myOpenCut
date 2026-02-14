@@ -9,18 +9,30 @@ import {
 	computeSidechainEnvelope,
 	getEnvelopeGainAtTime,
 } from "@/lib/sidechain/compute-envelope";
-import { collectAudioElements, createAudioContext } from "@/lib/media/audio";
+import { collectAudioElements } from "@/lib/media/audio";
 import { nanoid } from "nanoid";
 
 export class SidechainManager {
 	private listeners = new Set<() => void>();
 	private envelopeCache = new Map<string, SidechainEnvelope>();
 	private unsubscribers: Array<() => void> = [];
+	private decodeContext: AudioContext | null = null;
+
+	// Playback lookup tables: targetId -> envelope[] for O(1) lookup in hot path
+	private trackGainLookup: Map<string, SidechainEnvelope[]> | null = null;
+	private oneshotGainLookup: Map<string, SidechainEnvelope[]> | null = null;
 
 	constructor(private editor: EditorCore) {
 		this.unsubscribers.push(
 			this.editor.scenes.subscribe(() => this.invalidateCache()),
 		);
+	}
+
+	private getDecodeContext(): AudioContext {
+		if (!this.decodeContext) {
+			this.decodeContext = new AudioContext();
+		}
+		return this.decodeContext;
 	}
 
 	dispose(): void {
@@ -29,6 +41,10 @@ export class SidechainManager {
 		}
 		this.unsubscribers = [];
 		this.envelopeCache.clear();
+		if (this.decodeContext) {
+			void this.decodeContext.close();
+			this.decodeContext = null;
+		}
 	}
 
 	// ---- Config CRUD ----
@@ -151,7 +167,7 @@ export class SidechainManager {
 				if (!sourceTrack) return null;
 
 				const mediaAssets = this.editor.media.getAssets();
-				const audioContext = createAudioContext();
+				const audioContext = this.getDecodeContext();
 				const allElements = await collectAudioElements({
 					tracks: [sourceTrack],
 					mediaAssets,
@@ -212,11 +228,64 @@ export class SidechainManager {
 	}
 
 	/**
+	 * Build lookup tables mapping targetId -> envelope[] for O(1) access during playback.
+	 * Call after computeAllEnvelopes() and before the playback tick loop starts.
+	 */
+	prepareForPlayback(): void {
+		const trackLookup = new Map<string, SidechainEnvelope[]>();
+		const oneshotLookup = new Map<string, SidechainEnvelope[]>();
+
+		const configs = this.getConfigs().filter((c) => c.enabled);
+		for (const config of configs) {
+			const envelope = this.envelopeCache.get(config.id);
+			if (!envelope) continue;
+
+			for (const trackId of config.targetTrackIds) {
+				const arr = trackLookup.get(trackId);
+				if (arr) {
+					arr.push(envelope);
+				} else {
+					trackLookup.set(trackId, [envelope]);
+				}
+			}
+
+			for (const defId of config.targetOneshotDefinitionIds) {
+				const arr = oneshotLookup.get(defId);
+				if (arr) {
+					arr.push(envelope);
+				} else {
+					oneshotLookup.set(defId, [envelope]);
+				}
+			}
+		}
+
+		this.trackGainLookup = trackLookup;
+		this.oneshotGainLookup = oneshotLookup;
+	}
+
+	clearPlaybackCache(): void {
+		this.trackGainLookup = null;
+		this.oneshotGainLookup = null;
+	}
+
+	/**
 	 * Get the combined sidechain gain for a track at a given time.
 	 * Multiple sidechain configs targeting the same track are multiplied together.
 	 * Returns linear gain (0~1).
 	 */
 	getSidechainGainForTrack(trackId: string, time: number): number {
+		// Fast path: use prebuilt lookup table during playback
+		if (this.trackGainLookup) {
+			const envelopes = this.trackGainLookup.get(trackId);
+			if (!envelopes) return 1;
+			let combinedGain = 1;
+			for (const envelope of envelopes) {
+				combinedGain *= getEnvelopeGainAtTime(envelope, time);
+			}
+			return combinedGain;
+		}
+
+		// Slow path fallback: read scene + filter configs
 		const configs = this.getConfigs().filter(
 			(c) => c.enabled && c.targetTrackIds.includes(trackId),
 		);
@@ -239,6 +308,18 @@ export class SidechainManager {
 	 * Returns linear gain (0~1).
 	 */
 	getSidechainGainForOneshot(definitionId: string, time: number): number {
+		// Fast path: use prebuilt lookup table during playback
+		if (this.oneshotGainLookup) {
+			const envelopes = this.oneshotGainLookup.get(definitionId);
+			if (!envelopes) return 1;
+			let combinedGain = 1;
+			for (const envelope of envelopes) {
+				combinedGain *= getEnvelopeGainAtTime(envelope, time);
+			}
+			return combinedGain;
+		}
+
+		// Slow path fallback: read scene + filter configs
 		const configs = this.getConfigs().filter(
 			(c) =>
 				c.enabled &&

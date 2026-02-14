@@ -152,11 +152,21 @@ export class AudioManager {
 		this.clips = await collectAudioClips({ tracks, mediaAssets });
 		if (!this.editor.playback.getIsPlaying()) return;
 
-		// Pre-compute sidechain envelopes for playback
+		// Pre-compute sidechain envelopes and build lookup tables for playback
 		await this.editor.sidechain.computeAllEnvelopes();
+		this.editor.sidechain.prepareForPlayback();
+
+		// Cache automation data for playback
+		this.editor.automation.prepareForPlayback();
+
+		// Build sorted marker index for fast oneshot scheduling
+		this.editor.oneshot.prepareForPlayback();
 
 		this.playbackStartTime = time;
 		this.playbackStartContextTime = audioContext.currentTime;
+
+		// Unify visual timeline clock with AudioContext clock
+		this.editor.playback.setClockSource(() => this.getPlaybackTime());
 
 		this.scheduleUpcomingClips();
 
@@ -302,6 +312,12 @@ export class AudioManager {
 		this.queuedSources.clear();
 		this.clipGains.clear();
 		this.oneshotGainNodes.clear();
+
+		// Clear playback caches
+		this.editor.sidechain.clearPlaybackCache();
+		this.editor.automation.clearPlaybackCache();
+		this.editor.oneshot.clearPlaybackCache();
+		this.editor.playback.clearClockSource();
 	}
 
 	private async runClipIterator({

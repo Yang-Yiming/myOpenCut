@@ -10,6 +10,12 @@ export class PlaybackManager {
 	private playbackTimer: number | null = null;
 	private lastUpdate = 0;
 
+	// Unified clock: when set, derives time from AudioContext instead of performance.now()
+	private clockSource: (() => number) | null = null;
+	private lastClockValue = 0;
+	private clockStallTimestamp = 0;
+	private static readonly CLOCK_STALL_THRESHOLD_MS = 200;
+
 	constructor(private editor: EditorCore) {}
 
 	play(): void {
@@ -101,6 +107,17 @@ export class PlaybackManager {
 		return this.muted;
 	}
 
+	setClockSource(source: () => number): void {
+		this.clockSource = source;
+		this.lastClockValue = source();
+		this.clockStallTimestamp = 0;
+	}
+
+	clearClockSource(): void {
+		this.clockSource = null;
+		this.clockStallTimestamp = 0;
+	}
+
 	subscribe(listener: () => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
@@ -130,10 +147,39 @@ export class PlaybackManager {
 		if (!this.isPlaying) return;
 
 		const now = performance.now();
-		const delta = (now - this.lastUpdate) / 1000;
-		this.lastUpdate = now;
+		let newTime: number;
 
-		const newTime = this.currentTime + delta;
+		if (this.clockSource) {
+			// Unified clock path: derive time from AudioContext
+			const clockValue = this.clockSource();
+
+			if (clockValue !== this.lastClockValue) {
+				// Clock is advancing normally
+				this.lastClockValue = clockValue;
+				this.clockStallTimestamp = 0;
+				newTime = clockValue;
+			} else {
+				// Clock hasn't advanced — check for stall
+				if (this.clockStallTimestamp === 0) {
+					this.clockStallTimestamp = now;
+				}
+
+				if (now - this.clockStallTimestamp > PlaybackManager.CLOCK_STALL_THRESHOLD_MS) {
+					// Audio clock stalled for too long, fallback to performance.now() delta
+					const delta = (now - this.lastUpdate) / 1000;
+					newTime = this.currentTime + delta;
+				} else {
+					// Brief stall, hold current time
+					newTime = this.currentTime;
+				}
+			}
+		} else {
+			// Fallback: original performance.now() delta accumulation
+			const delta = (now - this.lastUpdate) / 1000;
+			newTime = this.currentTime + delta;
+		}
+
+		this.lastUpdate = now;
 		const duration = this.editor.timeline.getTotalDuration();
 
 		if (duration > 0 && newTime >= duration) {
