@@ -34,6 +34,10 @@ export class AudioManager {
 	private unsubscribers: Array<() => void> = [];
 	private scheduledOneshotIds = new Set<string>();
 	private oneshotBuffers = new Map<string, AudioBuffer>();
+	private oneshotGainNodes = new Map<
+		string,
+		{ gainNode: GainNode; definitionId: string; baseVolume: number }
+	>();
 
 	constructor(private editor: EditorCore) {
 		this.lastVolume = this.editor.playback.getVolume();
@@ -148,6 +152,9 @@ export class AudioManager {
 		this.clips = await collectAudioClips({ tracks, mediaAssets });
 		if (!this.editor.playback.getIsPlaying()) return;
 
+		// Pre-compute sidechain envelopes for playback
+		await this.editor.sidechain.computeAllEnvelopes();
+
 		this.playbackStartTime = time;
 		this.playbackStartContextTime = audioContext.currentTime;
 
@@ -255,10 +262,16 @@ export class AudioManager {
 		}
 
 		this.queuedSources.add(source);
+		this.oneshotGainNodes.set(marker.id, {
+			gainNode,
+			definitionId: definition.id,
+			baseVolume: marker.volume ?? 1,
+		});
 		source.addEventListener("ended", () => {
 			source.disconnect();
 			gainNode.disconnect();
 			this.queuedSources.delete(source);
+			this.oneshotGainNodes.delete(marker.id);
 		});
 	}
 
@@ -288,6 +301,7 @@ export class AudioManager {
 		}
 		this.queuedSources.clear();
 		this.clipGains.clear();
+		this.oneshotGainNodes.clear();
 	}
 
 	private async runClipIterator({
@@ -451,7 +465,17 @@ export class AudioManager {
 				currentTime,
 				clip.baseVolume * 100,
 			);
-			clipGain.gain.value = effectiveVolume / 100;
+			const sidechainGain = this.editor.sidechain.getSidechainGainForTrack(
+				clip.trackId,
+				currentTime,
+			);
+			clipGain.gain.value = (effectiveVolume / 100) * sidechainGain;
+		}
+
+		// Apply sidechain gain to active oneshot nodes
+		for (const [, { gainNode, definitionId, baseVolume }] of this.oneshotGainNodes) {
+			const scGain = this.editor.sidechain.getSidechainGainForOneshot(definitionId, currentTime);
+			gainNode.gain.value = baseVolume * scGain;
 		}
 	}
 

@@ -5,14 +5,16 @@ import type {
 	TimelineTrack,
 } from "@/types/timeline";
 import type { MediaAsset } from "@/types/assets";
+import type { SidechainEnvelope } from "@/types/sidechain";
 import { canElementHaveAudio } from "@/lib/timeline/element-utils";
 import { canTracktHaveAudio } from "@/lib/timeline";
 import { mediaSupportsAudio } from "@/lib/media/media-utils";
+import { getEnvelopeGainAtTime } from "@/lib/sidechain/compute-envelope";
 
 export type CollectedAudioElement = Omit<
 	AudioElement,
 	"type" | "mediaId" | "volume" | "id" | "name" | "sourceType" | "sourceUrl"
-> & { buffer: AudioBuffer; loop?: boolean };
+> & { buffer: AudioBuffer; loop?: boolean; trackId?: string };
 
 export function createAudioContext(): AudioContext {
 	const AudioContextConstructor =
@@ -75,6 +77,7 @@ export async function collectAudioElements({
 			if (element.duration <= 0) continue;
 
 			const isTrackMuted = canTracktHaveAudio(track) && track.muted;
+			const trackId = track.id;
 			pendingElements.push(
 				resolveAudioBufferForElement({
 					element,
@@ -90,6 +93,7 @@ export async function collectAudioElements({
 						trimEnd: element.trimEnd,
 						muted: element.muted || isTrackMuted,
 						loop: element.loop ?? false,
+						trackId,
 					};
 				}),
 			);
@@ -417,12 +421,14 @@ export async function createTimelineAudioBuffer({
 	duration,
 	sampleRate = 44100,
 	audioContext,
+	sidechainEnvelopes,
 }: {
 	tracks: TimelineTrack[];
 	mediaAssets: MediaAsset[];
 	duration: number;
 	sampleRate?: number;
 	audioContext?: AudioContext;
+	sidechainEnvelopes?: Map<string, SidechainEnvelope[]>;
 }): Promise<AudioBuffer | null> {
 	const context = audioContext ?? createAudioContext();
 
@@ -450,6 +456,9 @@ export async function createTimelineAudioBuffer({
 			outputBuffer,
 			outputLength,
 			sampleRate,
+			sidechainEnvelopes: element.trackId
+				? sidechainEnvelopes?.get(element.trackId)
+				: undefined,
 		});
 	}
 
@@ -461,11 +470,13 @@ function mixAudioChannels({
 	outputBuffer,
 	outputLength,
 	sampleRate,
+	sidechainEnvelopes,
 }: {
 	element: CollectedAudioElement;
 	outputBuffer: AudioBuffer;
 	outputLength: number;
 	sampleRate: number;
+	sidechainEnvelopes?: SidechainEnvelope[];
 }): void {
 	const { buffer, startTime, trimStart, duration: elementDuration, loop } = element;
 
@@ -496,7 +507,17 @@ function mixAudioChannels({
 			const sourceIndex = sourceStartSample + Math.floor(sourceOffset / resampleRatio);
 			if (sourceIndex >= sourceData.length) break;
 
-			outputData[outputIndex] += sourceData[sourceIndex];
+			let sample = sourceData[sourceIndex];
+
+			// Apply sidechain gain if envelopes are provided
+			if (sidechainEnvelopes && sidechainEnvelopes.length > 0) {
+				const timeAtSample = outputIndex / sampleRate;
+				for (const envelope of sidechainEnvelopes) {
+					sample *= getEnvelopeGainAtTime(envelope, timeAtSample);
+				}
+			}
+
+			outputData[outputIndex] += sample;
 		}
 	}
 }

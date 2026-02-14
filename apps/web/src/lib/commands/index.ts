@@ -6,3 +6,4 @@ export * from "./scene";
 export * from "./project";
 export * from "./automation";
 export * from "./oneshot";
+export * from "./sidechain";

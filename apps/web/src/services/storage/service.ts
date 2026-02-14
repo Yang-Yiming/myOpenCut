@@ -98,6 +98,7 @@ class StorageService {
 			automationMarkers: scene.automationMarkers,
 			oneshotDefinitions: scene.oneshotDefinitions,
 			oneshotMarkers: scene.oneshotMarkers,
+			sidechainConfigs: scene.sidechainConfigs,
 			createdAt: scene.createdAt.toISOString(),
 			updatedAt: scene.updatedAt.toISOString(),
 		}));
@@ -146,6 +147,10 @@ class StorageService {
 				automationMarkers: scene.automationMarkers ?? [],
 				oneshotDefinitions: scene.oneshotDefinitions ?? [],
 				oneshotMarkers: scene.oneshotMarkers ?? [],
+				sidechainConfigs: (scene.sidechainConfigs ?? []).map((c: any) => {
+					if (c.source) return { ...c, targetOneshotDefinitionIds: c.targetOneshotDefinitionIds ?? [] };
+					return { ...c, source: { type: "track", trackId: c.sourceTrackId }, targetOneshotDefinitionIds: [] };
+				}),
 				createdAt: new Date(scene.createdAt),
 				updatedAt: new Date(scene.updatedAt),
 			})) ?? [];

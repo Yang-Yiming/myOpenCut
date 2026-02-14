@@ -10,6 +10,7 @@ import { AudioManager } from "./managers/audio-manager";
 import { SelectionManager } from "./managers/selection-manager";
 import { AutomationManager } from "./managers/automation-manager";
 import { OneshotManager } from "./managers/oneshot-manager";
+import { SidechainManager } from "./managers/sidechain-manager";
 
 export class EditorCore {
 	private static instance: EditorCore | null = null;
@@ -26,6 +27,7 @@ export class EditorCore {
 	public readonly selection: SelectionManager;
 	public readonly automation: AutomationManager;
 	public readonly oneshot: OneshotManager;
+	public readonly sidechain: SidechainManager;
 
 	private constructor() {
 		this.command = new CommandManager();
@@ -40,6 +42,7 @@ export class EditorCore {
 		this.selection = new SelectionManager(this);
 		this.automation = new AutomationManager(this);
 		this.oneshot = new OneshotManager(this);
+		this.sidechain = new SidechainManager(this);
 		this.save.start();
 	}
 

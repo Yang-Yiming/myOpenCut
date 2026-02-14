@@ -1,6 +1,7 @@
 import type { EditorCore } from "@/core";
 import type { RootNode } from "@/services/renderer/nodes/root-node";
 import type { ExportOptions, ExportResult } from "@/types/export";
+import type { SidechainEnvelope } from "@/types/sidechain";
 import { SceneExporter } from "@/services/renderer/scene-exporter";
 import { buildScene } from "@/services/renderer/scene-builder";
 import { createTimelineAudioBuffer } from "@/lib/media/audio";
@@ -55,6 +56,11 @@ export class RendererManager {
 			let audioBuffer: AudioBuffer | null = null;
 			if (includeAudio) {
 				onProgress?.({ progress: 0.05 });
+
+				// Compute sidechain envelopes for export
+				await this.editor.sidechain.computeAllEnvelopes();
+				const sidechainEnvelopes = this.buildSidechainEnvelopeMap();
+
 				if (timeRemapConfig) {
 					audioBuffer = await createTimelineAudioBufferWithRemap({
 						tracks,
@@ -67,6 +73,7 @@ export class RendererManager {
 						tracks,
 						mediaAssets,
 						duration,
+						sidechainEnvelopes,
 					});
 				}
 			}
@@ -138,6 +145,28 @@ export class RendererManager {
 	subscribe(listener: () => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
+	}
+
+	/**
+	 * Build a map of trackId -> SidechainEnvelope[] for all enabled sidechain configs.
+	 * Used during export to apply sidechain gain per-sample.
+	 */
+	private buildSidechainEnvelopeMap(): Map<string, SidechainEnvelope[]> {
+		const envelopeMap = new Map<string, SidechainEnvelope[]>();
+		const configs = this.editor.sidechain.getConfigs().filter((c) => c.enabled);
+
+		for (const config of configs) {
+			const envelope = this.editor.sidechain.getCachedEnvelope(config.id);
+			if (!envelope) continue;
+
+			for (const targetTrackId of config.targetTrackIds) {
+				const existing = envelopeMap.get(targetTrackId) || [];
+				existing.push(envelope);
+				envelopeMap.set(targetTrackId, existing);
+			}
+		}
+
+		return envelopeMap;
 	}
 
 	private notify(): void {

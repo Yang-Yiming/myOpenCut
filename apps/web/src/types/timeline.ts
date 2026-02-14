@@ -1,5 +1,6 @@
 import type { AutomationMarker, AutomationState } from "./automation";
 import type { OneshotDefinition, OneshotMarker } from "./oneshot";
+import type { SidechainConfig } from "./sidechain";
 
 export interface TScene {
 	id: string;
@@ -11,6 +12,7 @@ export interface TScene {
 	automationMarkers?: AutomationMarker[];
 	oneshotDefinitions?: OneshotDefinition[];
 	oneshotMarkers?: OneshotMarker[];
+	sidechainConfigs?: SidechainConfig[];
 	createdAt: Date;
 	updatedAt: Date;
 }

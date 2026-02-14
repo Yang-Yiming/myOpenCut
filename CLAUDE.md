@@ -208,3 +208,44 @@ The project uses Drizzle ORM with PostgreSQL:
 - Configuration: `biome.json` in project root
 - Run `bun lint:fix` or `bun format` before committing
 
+## Agent Reminders (Pitfalls & Gotchas)
+
+### MUST: Run `tsc --noEmit` After Every Change
+TypeScript errors silently prevent changes from taking effect in the dev server (Turbopack). If you make changes and the user says "it's not working / nothing changed", the first thing to check is whether the code compiles. Run:
+```bash
+npx tsc --noEmit -p apps/web/tsconfig.json 2>&1 | head -40
+```
+Note: `oneshot-manager.ts:261` has a pre-existing `string | undefined` vs `string | null` error — ignore it.
+
+### Discriminated Union Narrowing Through Property Chains
+TypeScript does NOT narrow discriminated unions through property access chains. This is a common trap with types like `SidechainSource`:
+```typescript
+// BAD — TS error: 'trackId' does not exist on type SidechainSource
+if (config.source.type === "track") {
+  const id = config.source.trackId; // TS2339
+}
+
+// GOOD — extract first, then narrow
+const { source } = config;
+if (source.type === "track") {
+  const id = source.trackId; // OK
+}
+```
+
+### Storage Service: Explicit Field Listing
+`services/storage/service.ts` serializes scenes by **explicitly listing every field** (not using spread). When adding a new field to `TScene` in `types/timeline.ts`, you MUST manually add it to BOTH:
+1. **Save** (~`saveProject` method, the `serializedScenes` map)
+2. **Load** (~`loadProject` method, the `scenes` map)
+
+Forgetting either side means the field silently disappears on save or load. This has caused data loss bugs before (e.g. `sidechainConfigs` was missing from both save and load).
+
+### `collectAudioElements` Returns `loop: boolean | undefined`
+When mapping results from `collectAudioElements()` into typed arrays that expect `loop: boolean`, always use `el.loop ?? false`. The `loop` field on audio elements in `types/timeline.ts` is `loop?: boolean` (optional).
+
+### Sidechain Architecture
+- **Source**: `SidechainSource` is a discriminated union (`{ type: "track"; trackId } | { type: "oneshot"; definitionId }`). Always narrow before accessing variant-specific fields.
+- **Targets**: A sidechain config can target both tracks (`targetTrackIds`) AND oneshot definitions (`targetOneshotDefinitionIds`). Both must be checked/updated together.
+- **Persistence**: `sidechainConfigs` lives on `TScene` (per-scene). The storage service has migration logic to convert old `sourceTrackId: string` format to the new `source: SidechainSource` union.
+- **Cache invalidation**: `SidechainManager` subscribes to `editor.scenes` changes to auto-clear envelope cache on scene switch. The `updateConfig` method invalidates on `updates.source` (not the old `updates.sourceTrackId`).
+- **Playback**: `AudioManager.oneshotGainNodes` tracks active oneshot gain nodes for real-time sidechain ducking. Cleaned up in `stopPlayback()`.
+

@@ -29,6 +29,7 @@ import { AutomationStateDialog } from "@/components/editor/dialogs/automation-st
 import { AutomationStateSelectionDialog } from "@/components/editor/dialogs/automation-state-selection-dialog";
 import { getTrackDisplayName } from "@/lib/timeline/track-utils";
 import { OneshotView } from "./oneshot-view";
+import { SidechainView } from "./sidechain-view";
 
 export function AutomationView() {
 	const { startCreatingState } = useAutomationStore();
@@ -44,6 +45,9 @@ export function AutomationView() {
 						</TabsTrigger>
 						<TabsTrigger value="oneshot" className="flex-1">
 							Oneshot
+						</TabsTrigger>
+						<TabsTrigger value="sidechain" className="flex-1">
+							Sidechain
 						</TabsTrigger>
 					</TabsList>
 				</div>
@@ -71,6 +75,11 @@ export function AutomationView() {
 				{/* Oneshot Tab Content */}
 				<TabsContent value="oneshot" className="flex-1 min-h-0 flex flex-col mt-0">
 					<OneshotView />
+				</TabsContent>
+
+				{/* Sidechain Tab Content */}
+				<TabsContent value="sidechain" className="flex-1 min-h-0 flex flex-col mt-0">
+					<SidechainView />
 				</TabsContent>
 			</Tabs>
 
