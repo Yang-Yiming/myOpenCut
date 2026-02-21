@@ -139,7 +139,7 @@ function AutomationStateCard({ state }: { state: AutomationState }) {
 	};
 
 	const handleEdit = () => {
-		startEditingState(state.id);
+		setTimeout(() => startEditingState(state.id), 0);
 	};
 
 	const handleToggleMarkMode = () => {

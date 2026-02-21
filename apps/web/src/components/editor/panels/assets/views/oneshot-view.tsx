@@ -131,7 +131,7 @@ function OneshotCard({ definition }: { definition: OneshotDefinition }) {
 	};
 
 	const handleEdit = () => {
-		startEditingOneshot(definition.id);
+		setTimeout(() => startEditingOneshot(definition.id), 0);
 	};
 
 	const handleToggleMarkMode = () => {

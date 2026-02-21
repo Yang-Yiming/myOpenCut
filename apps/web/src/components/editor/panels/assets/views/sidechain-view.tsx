@@ -132,7 +132,7 @@ function SidechainCard({ config }: { config: SidechainConfig }) {
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
-							<DropdownMenuItem onClick={() => startEditing(config.id)}>
+							<DropdownMenuItem onClick={() => setTimeout(() => startEditing(config.id), 0)}>
 								Edit
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={handleDelete} className="text-destructive">
