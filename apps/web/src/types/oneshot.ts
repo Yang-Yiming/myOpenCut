@@ -13,6 +13,7 @@ export interface OneshotDefinition {
 	trimEnd: number; // End of audio slice (seconds)
 	cuePoint: number; // Sync point within slice (seconds from trimStart)
 	audioDuration: number; // Total duration of source audio
+	volume?: number; // Per-definition volume (0-1), defaults to 1
 	createdAt: number;
 	updatedAt: number;
 }

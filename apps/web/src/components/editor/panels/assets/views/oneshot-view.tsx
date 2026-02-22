@@ -13,7 +13,8 @@ import { PlusSignIcon, MoreVerticalIcon, ArrowDown01Icon, ArrowUp01Icon } from "
 import { useEditor } from "@/hooks/use-editor";
 import { useOneshotStore } from "@/stores/oneshot-store";
 import type { OneshotDefinition } from "@/types/oneshot";
-import { DeleteOneshotCommand, DeleteOneshotMarkerCommand } from "@/lib/commands";
+import { DeleteOneshotCommand, DeleteOneshotMarkerCommand, UpdateOneshotCommand } from "@/lib/commands";
+import { Slider } from "@/components/ui/slider";
 import { useState, useEffect, useCallback } from "react";
 import { OneshotDefinitionDialog } from "@/components/editor/dialogs/oneshot-definition-dialog";
 import { OneshotSelectionDialog } from "@/components/editor/dialogs/oneshot-selection-dialog";
@@ -176,6 +177,24 @@ function OneshotCard({ definition }: { definition: OneshotDefinition }) {
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+			</div>
+
+			{/* Volume slider */}
+			<div className="mt-3 flex items-center gap-2">
+				<span className="text-xs text-muted-foreground w-12 shrink-0">Volume</span>
+				<Slider
+					min={0}
+					max={100}
+					step={1}
+					value={[Math.round((definition.volume ?? 1) * 100)]}
+					onValueChange={(value) =>
+						editor.command.execute(new UpdateOneshotCommand(definition.id, { volume: value[0] / 100 }))
+					}
+					className="flex-1"
+				/>
+				<span className="text-xs text-muted-foreground w-8 text-right">
+					{Math.round((definition.volume ?? 1) * 100)}%
+				</span>
 			</div>
 
 			{/* Mark Mode button */}

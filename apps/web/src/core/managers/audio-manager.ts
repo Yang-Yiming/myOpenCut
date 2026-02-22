@@ -223,7 +223,7 @@ export class AudioManager {
 
 	private async playOneshotMarker(
 		marker: { id: string; volume?: number },
-		definition: { id: string; audioSource: { url: string }; trimStart: number; trimEnd: number },
+		definition: { id: string; audioSource: { url: string }; trimStart: number; trimEnd: number; volume?: number },
 		audioStartTime: number,
 	): Promise<void> {
 		const audioContext = this.audioContext;
@@ -245,7 +245,7 @@ export class AudioManager {
 
 		// Create gain node for volume control
 		const gainNode = audioContext.createGain();
-		gainNode.gain.value = marker.volume ?? 1;
+		gainNode.gain.value = (definition.volume ?? 1) * (marker.volume ?? 1);
 		source.connect(gainNode);
 		gainNode.connect(this.masterGain);
 
@@ -275,7 +275,7 @@ export class AudioManager {
 		this.oneshotGainNodes.set(marker.id, {
 			gainNode,
 			definitionId: definition.id,
-			baseVolume: marker.volume ?? 1,
+		baseVolume: (definition.volume ?? 1) * (marker.volume ?? 1),
 		});
 		source.addEventListener("ended", () => {
 			source.disconnect();
