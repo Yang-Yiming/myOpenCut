@@ -60,6 +60,14 @@ export class RendererManager {
 				// Compute sidechain envelopes for export
 				await this.editor.sidechain.computeAllEnvelopes();
 				const sidechainEnvelopes = this.buildSidechainEnvelopeMap();
+				const activeScene = this.editor.scenes.getActiveSceneOrNull();
+
+				// Build cached audio buffer map from OneshotManager
+				const oneshotAudioBuffers = new Map<string, AudioBuffer>();
+				for (const def of activeScene?.oneshotDefinitions ?? []) {
+					const buf = this.editor.oneshot.getCachedAudioBuffer(def.id);
+					if (buf) oneshotAudioBuffers.set(def.id, buf);
+				}
 
 				if (timeRemapConfig) {
 					audioBuffer = await createTimelineAudioBufferWithRemap({
@@ -67,6 +75,9 @@ export class RendererManager {
 						mediaAssets,
 						originalDuration,
 						timeRemapConfig,
+						oneshotDefinitions: activeScene?.oneshotDefinitions ?? [],
+						oneshotMarkers: activeScene?.oneshotMarkers ?? [],
+						oneshotAudioBuffers,
 					});
 				} else {
 					audioBuffer = await createTimelineAudioBuffer({
@@ -74,6 +85,9 @@ export class RendererManager {
 						mediaAssets,
 						duration,
 						sidechainEnvelopes,
+						oneshotDefinitions: activeScene?.oneshotDefinitions ?? [],
+						oneshotMarkers: activeScene?.oneshotMarkers ?? [],
+						oneshotAudioBuffers,
 					});
 				}
 			}
@@ -163,6 +177,12 @@ export class RendererManager {
 				const existing = envelopeMap.get(targetTrackId) || [];
 				existing.push(envelope);
 				envelopeMap.set(targetTrackId, existing);
+			}
+
+			for (const defId of config.targetOneshotDefinitionIds) {
+				const existing = envelopeMap.get(defId) ?? [];
+				existing.push(envelope);
+				envelopeMap.set(defId, existing);
 			}
 		}
 

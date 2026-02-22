@@ -6,6 +6,7 @@ import type {
 } from "@/types/timeline";
 import type { MediaAsset } from "@/types/assets";
 import type { SidechainEnvelope } from "@/types/sidechain";
+import type { OneshotDefinition, OneshotMarker } from "@/types/oneshot";
 import { canElementHaveAudio } from "@/lib/timeline/element-utils";
 import { canTracktHaveAudio } from "@/lib/timeline";
 import { mediaSupportsAudio } from "@/lib/media/media-utils";
@@ -14,7 +15,7 @@ import { getEnvelopeGainAtTime } from "@/lib/sidechain/compute-envelope";
 export type CollectedAudioElement = Omit<
 	AudioElement,
 	"type" | "mediaId" | "volume" | "id" | "name" | "sourceType" | "sourceUrl"
-> & { buffer: AudioBuffer; loop?: boolean; trackId?: string };
+> & { buffer: AudioBuffer; loop?: boolean; trackId?: string; volume?: number; oneshotDefinitionId?: string };
 
 export function createAudioContext(): AudioContext {
 	const AudioContextConstructor =
@@ -106,6 +107,87 @@ export async function collectAudioElements({
 		if (element) audioElements.push(element);
 	}
 	return audioElements;
+}
+
+export async function collectOneshotAudioElements({
+	oneshotDefinitions,
+	oneshotMarkers,
+	audioContext,
+	mediaAssets,
+	cachedBuffers,
+}: {
+	oneshotDefinitions: OneshotDefinition[];
+	oneshotMarkers: OneshotMarker[];
+	audioContext: AudioContext;
+	mediaAssets?: MediaAsset[];
+	cachedBuffers?: Map<string, AudioBuffer>;
+}): Promise<CollectedAudioElement[]> {
+	const mediaMap = mediaAssets
+		? new Map<string, MediaAsset>(mediaAssets.map((a) => [a.id, a]))
+		: undefined;
+	const defMap = new Map<string, OneshotDefinition>(
+		oneshotDefinitions.map((d) => [d.id, d]),
+	);
+
+	const markersByDef = new Map<string, OneshotMarker[]>();
+	for (const marker of oneshotMarkers) {
+		const existing = markersByDef.get(marker.oneshotId) ?? [];
+		existing.push(marker);
+		markersByDef.set(marker.oneshotId, existing);
+	}
+
+	const results: CollectedAudioElement[] = [];
+	const pending: Array<Promise<void>> = [];
+
+	for (const [defId, markers] of markersByDef) {
+		const def = defMap.get(defId);
+		if (!def) continue;
+
+		const pushMarkers = (buffer: AudioBuffer) => {
+			for (const marker of markers) {
+				results.push({
+					buffer,
+					startTime: marker.time - (def.cuePoint - def.trimStart),
+					duration: def.trimEnd - def.trimStart,
+					trimStart: def.trimStart,
+					trimEnd: def.trimEnd,
+					muted: false,
+					volume: (def.volume ?? 1) * (marker.volume ?? 1),
+					oneshotDefinitionId: def.id,
+				});
+			}
+		};
+
+		const cached = cachedBuffers?.get(defId);
+		if (cached) {
+			pushMarkers(cached);
+			continue;
+		}
+
+		pending.push(
+			(async () => {
+				try {
+					let arrayBuffer: ArrayBuffer;
+					const { audioSource } = def;
+					if (audioSource.type === "upload" && mediaMap) {
+						const asset = mediaMap.get(audioSource.fileId);
+						if (!asset) return;
+						arrayBuffer = await asset.file.arrayBuffer();
+					} else {
+						const response = await fetch(audioSource.url);
+						if (!response.ok) return;
+						arrayBuffer = await response.arrayBuffer();
+					}
+					pushMarkers(await audioContext.decodeAudioData(arrayBuffer.slice(0)));
+				} catch (e) {
+					console.warn("Failed to decode oneshot audio:", defId, e);
+				}
+			})(),
+		);
+	}
+
+	await Promise.all(pending);
+	return results;
 }
 
 async function resolveAudioBufferForElement({
@@ -422,6 +504,9 @@ export async function createTimelineAudioBuffer({
 	sampleRate = 44100,
 	audioContext,
 	sidechainEnvelopes,
+	oneshotDefinitions,
+	oneshotMarkers,
+	oneshotAudioBuffers,
 }: {
 	tracks: TimelineTrack[];
 	mediaAssets: MediaAsset[];
@@ -429,6 +514,9 @@ export async function createTimelineAudioBuffer({
 	sampleRate?: number;
 	audioContext?: AudioContext;
 	sidechainEnvelopes?: Map<string, SidechainEnvelope[]>;
+	oneshotDefinitions?: OneshotDefinition[];
+	oneshotMarkers?: OneshotMarker[];
+	oneshotAudioBuffers?: Map<string, AudioBuffer>;
 }): Promise<AudioBuffer | null> {
 	const context = audioContext ?? createAudioContext();
 
@@ -438,7 +526,20 @@ export async function createTimelineAudioBuffer({
 		audioContext: context,
 	});
 
-	if (audioElements.length === 0) return null;
+	const oneshotElements =
+		oneshotDefinitions && oneshotMarkers
+			? await collectOneshotAudioElements({
+					oneshotDefinitions,
+					oneshotMarkers,
+					audioContext: context,
+					mediaAssets,
+					cachedBuffers: oneshotAudioBuffers,
+				})
+			: [];
+
+	const allElements = [...audioElements, ...oneshotElements];
+
+	if (allElements.length === 0) return null;
 
 	const outputChannels = 2;
 	const outputLength = Math.ceil(duration * sampleRate);
@@ -448,17 +549,21 @@ export async function createTimelineAudioBuffer({
 		sampleRate,
 	);
 
-	for (const element of audioElements) {
+	for (const element of allElements) {
 		if (element.muted) continue;
+
+		const envelopes = element.trackId
+			? sidechainEnvelopes?.get(element.trackId)
+			: element.oneshotDefinitionId
+				? sidechainEnvelopes?.get(element.oneshotDefinitionId)
+				: undefined;
 
 		mixAudioChannels({
 			element,
 			outputBuffer,
 			outputLength,
 			sampleRate,
-			sidechainEnvelopes: element.trackId
-				? sidechainEnvelopes?.get(element.trackId)
-				: undefined,
+			sidechainEnvelopes: envelopes,
 		});
 	}
 
@@ -517,7 +622,7 @@ function mixAudioChannels({
 				}
 			}
 
-			outputData[outputIndex] += sample;
+			outputData[outputIndex] += sample * (element.volume ?? 1);
 		}
 	}
 }

@@ -261,3 +261,6 @@ Several managers use a `prepareForPlayback()` / `clearPlaybackCache()` pattern t
 ### AudioContext Reuse for Decoding
 `OneshotManager` and `SidechainManager` each reuse a single `AudioContext` (via `getDecodeContext()`) for `decodeAudioData` calls. Do NOT create `new AudioContext()` per decode — browsers limit to 6-8 contexts and excess ones silently fail.
 
+### Oneshot Audio in Export
+Export must pass `OneshotManager.getCachedAudioBuffer()` results via the `oneshotAudioBuffers` / `cachedBuffers` param to `collectOneshotAudioElements`. Blob URLs for uploaded oneshots go stale, so the cached `AudioBuffer` from playback is the primary source; fetch/file-read is fallback only. The cache is populated when the user previews playback (`OneshotManager.loadAudioBuffer()`). If export runs without prior playback, the fallback resolves uploads via `mediaAssets` file and library sounds via HTTP fetch.
+

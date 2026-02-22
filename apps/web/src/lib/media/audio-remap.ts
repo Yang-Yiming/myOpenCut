@@ -5,6 +5,7 @@ import type { OneshotDefinition, OneshotMarker } from "@/types/oneshot";
 import {
 	createAudioContext,
 	collectAudioElements,
+	collectOneshotAudioElements,
 	type CollectedAudioElement,
 } from "./audio";
 import {
@@ -90,6 +91,9 @@ export async function createTimelineAudioBufferWithRemap({
 	timeRemapConfig,
 	sampleRate = 44100,
 	audioContext,
+	oneshotDefinitions,
+	oneshotMarkers,
+	oneshotAudioBuffers,
 }: {
 	tracks: TimelineTrack[];
 	mediaAssets: MediaAsset[];
@@ -97,6 +101,9 @@ export async function createTimelineAudioBufferWithRemap({
 	timeRemapConfig: TimeRemapConfig;
 	sampleRate?: number;
 	audioContext?: AudioContext;
+	oneshotDefinitions?: OneshotDefinition[];
+	oneshotMarkers?: OneshotMarker[];
+	oneshotAudioBuffers?: Map<string, AudioBuffer>;
 }): Promise<AudioBuffer | null> {
 	const context = audioContext ?? createAudioContext();
 	const newDuration = getRemappedDuration(originalDuration, timeRemapConfig.timeScale);
@@ -107,6 +114,24 @@ export async function createTimelineAudioBufferWithRemap({
 		audioContext: context,
 		timeRemapConfig,
 	});
+
+	if (oneshotDefinitions && oneshotMarkers) {
+		const oneshotEls = await collectOneshotAudioElements({
+			oneshotDefinitions,
+			oneshotMarkers,
+			audioContext: context,
+			mediaAssets,
+			cachedBuffers: oneshotAudioBuffers,
+		});
+		for (const el of oneshotEls) {
+			remappedElements.push({
+				...el,
+				behavior: "fixed" as const,
+				playbackRate: 1,
+				startTime: remapTime(el.startTime, timeRemapConfig.timeScale),
+			});
+		}
+	}
 
 	if (remappedElements.length === 0) return null;
 
