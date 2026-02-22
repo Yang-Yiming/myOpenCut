@@ -19,18 +19,21 @@ export interface BaseMediaNodeParams {
 
 export interface VideoNodeParams extends BaseMediaNodeParams {
 	mediaId: string;
+	timeScale?: number;
 }
 
 export class VideoNode extends BaseNode<VideoNodeParams> {
 	private getVideoTime(time: number) {
-		return time - this.params.timeOffset + this.params.trimStart;
+		const scale = this.params.timeScale ?? 1;
+		return (time - this.params.timeOffset) * scale + this.params.trimStart;
 	}
 
 	private isInRange(time: number) {
 		const videoTime = this.getVideoTime(time);
+		const scale = this.params.timeScale ?? 1;
 		return (
 			videoTime >= this.params.trimStart - VIDEO_EPSILON &&
-			videoTime < this.params.trimStart + this.params.duration
+			videoTime < this.params.trimStart + this.params.duration * scale
 		);
 	}
 

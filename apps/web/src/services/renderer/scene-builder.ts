@@ -62,7 +62,7 @@ export function buildScene(params: BuildSceneParams) {
 			const elementStartTime = timeRemapConfig
 				? remapTime(element.startTime, timeScale)
 				: element.startTime;
-			const elementDuration = trackBehavior === "stretch" && timeRemapConfig
+			const elementDuration = (trackBehavior === "stretch" || trackBehavior === "pitch-preserve") && timeRemapConfig
 				? remapTime(element.duration, timeScale)
 				: element.duration;
 
@@ -73,6 +73,9 @@ export function buildScene(params: BuildSceneParams) {
 				}
 
 				if (mediaAsset.type === "video") {
+					const videoTimeScale = (trackBehavior === "stretch" || trackBehavior === "pitch-preserve") && timeRemapConfig
+						? timeScale
+						: undefined;
 					contentNodes.push(
 						new VideoNode({
 							mediaId: mediaAsset.id,
@@ -81,6 +84,7 @@ export function buildScene(params: BuildSceneParams) {
 							timeOffset: elementStartTime,
 							trimStart: element.trimStart,
 							trimEnd: element.trimEnd,
+							timeScale: videoTimeScale,
 						}),
 					);
 				}
